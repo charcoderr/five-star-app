@@ -10,6 +10,8 @@ import { useProforma, useReport, useSaveDraft, useSubmitReport, useUploadPhoto, 
 import { useAuthStore } from '../../../stores/authStore';
 import { ProformaQuestion, ReportAnswer } from '../../../types';
 import { PROFORMA_CATEGORIES } from '../../../utils/defaultProforma';
+import { useDineTimers } from '../../../hooks/useDineTimers';
+import DineTimerPanel from '../../../components/DineTimerPanel';
 
 // ─── Score Picker ────────────────────────────────────────────────────────────
 function ScorePicker({ value, onChange }: { value?: number; onChange: (v: number) => void }) {
@@ -89,6 +91,7 @@ export default function ReportScreen() {
   const [answers, setAnswers] = useState<Record<string, ReportAnswer>>({});
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dineTimers = useDineTimers();
 
   // Merge remote answers into local on first load
   const answersRef = useRef(false);
@@ -205,6 +208,18 @@ export default function ReportScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        {/* ── In-dine timers (optional) ──────────────────────────────────── */}
+        <DineTimerPanel
+          enabled={dineTimers.enabled}
+          onToggleEnabled={dineTimers.setEnabled}
+          timers={dineTimers.timers}
+          liveElapsed={dineTimers.liveElapsed}
+          onStart={dineTimers.startTimer}
+          onStop={dineTimers.stopTimer}
+          onManual={dineTimers.setManualTime}
+          onReset={dineTimers.resetTimer}
+        />
+
         {PROFORMA_CATEGORIES.map(category => {
           const questions = questionsByCategory[category];
           if (!questions || questions.length === 0) return null;
