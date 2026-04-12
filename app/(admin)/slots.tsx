@@ -5,7 +5,8 @@ import {
   TextInput, ScrollView, Platform,
 } from 'react-native';
 import { colours } from '../../utils/theme';
-import { useAllSlots, useCreateSlot, useConfirmAssignment, useSlotAssignments } from '../../hooks/useSlots';
+import { useAllSlots, useCreateSlot, useSlotAssignments } from '../../hooks/useSlots';
+import { useIssueVoucher } from '../../hooks/useVouchers';
 import { useAuthStore } from '../../stores/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
@@ -30,7 +31,8 @@ function useRestaurants() {
 
 function AssignmentsModal({ slotId, onClose }: { slotId: string; onClose: () => void }) {
   const { data: assignments, isLoading } = useSlotAssignments(slotId);
-  const confirm = useConfirmAssignment();
+  const issueVoucher = useIssueVoucher();
+  const [voucherValue, setVoucherValue] = useState<Record<string, string>>({});
 
   return (
     <View style={modalStyles.container}>
@@ -42,23 +44,55 @@ function AssignmentsModal({ slotId, onClose }: { slotId: string; onClose: () => 
       ) : (
         assignments?.map(a => (
           <View key={a.id} style={modalStyles.row}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={modalStyles.dinerName}>{a.diner?.name}</Text>
               <Text style={modalStyles.dinerEmail}>{a.diner?.email}</Text>
               <Text style={[modalStyles.status, { color: STATUS_COLOURS[a.status] ?? colours.textMuted }]}>
                 {a.status.toUpperCase()}
               </Text>
+              {a.status === 'pending' && (
+                <View style={modalStyles.voucherRow}>
+                  <Text style={modalStyles.voucherLabel}>£ Voucher value</Text>
+                  <TextInput
+                    style={modalStyles.voucherInput}
+                    placeholder="e.g. 40"
+                    value={voucherValue[a.id] ?? ''}
+                    onChangeText={v => setVoucherValue(prev => ({ ...prev, [a.id]: v }))}
+                    keyboardType="number-pad"
+                    placeholderTextColor={colours.textMuted}
+                  />
+                </View>
+              )}
             </View>
             {a.status === 'pending' && (
               <TouchableOpacity
                 style={modalStyles.confirmBtn}
+                disabled={issueVoucher.isPending}
                 onPress={async () => {
-                  await confirm.mutateAsync(a.id);
-                  Alert.alert('Confirmed!', `${a.diner?.name} has been confirmed for this dine.`);
-                  onClose();
+                  const value = parseFloat(voucherValue[a.id] ?? '0');
+                  if (!value || value <= 0) {
+                    Alert.alert('Enter a voucher value', 'Please set a £ value before confirming.');
+                    return;
+                  }
+                  try {
+                    await issueVoucher.mutateAsync({
+                      assignmentId: a.id,
+                      dinerId: a.diner_id,
+                      value,
+                    });
+                    Alert.alert(
+                      'Confirmed & Voucher Issued!',
+                      `${a.diner?.name} has been confirmed and a £${value} voucher has been sent to their app.`
+                    );
+                    onClose();
+                  } catch {
+                    Alert.alert('Error', 'Could not confirm assignment. Please try again.');
+                  }
                 }}
               >
-                <Text style={modalStyles.confirmBtnText}>Confirm</Text>
+                {issueVoucher.isPending
+                  ? <ActivityIndicator color={colours.charcoalDark} size="small" />
+                  : <Text style={modalStyles.confirmBtnText}>Confirm + Issue Voucher</Text>}
               </TouchableOpacity>
             )}
           </View>
@@ -296,8 +330,11 @@ const modalStyles = StyleSheet.create({
   dinerName: { fontSize: 15, fontWeight: '700', color: colours.textPrimary },
   dinerEmail: { fontSize: 13, color: colours.textSecondary },
   status: { fontSize: 11, fontWeight: '700', marginTop: 4 },
-  confirmBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
-  confirmBtnText: { fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
+  voucherRow: { marginTop: 8 },
+  voucherLabel: { fontSize: 12, fontWeight: '600', color: colours.textSecondary, marginBottom: 4 },
+  voucherInput: { backgroundColor: colours.offWhite, borderWidth: 1, borderColor: colours.border, borderRadius: 8, padding: 8, fontSize: 15, color: colours.textPrimary, width: 120 },
+  confirmBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-end', minWidth: 80, alignItems: 'center' },
+  confirmBtnText: { fontSize: 12, fontWeight: '700', color: colours.charcoalDark },
   closeBtn: { alignItems: 'center', marginTop: 20, padding: 12 },
   closeBtnText: { fontSize: 14, color: colours.textMuted },
 });

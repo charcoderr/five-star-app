@@ -94,8 +94,9 @@ create table public.vouchers (
   assignment_id uuid references public.assignments(id) on delete cascade not null,
   diner_id uuid references public.users(id) not null,
   value numeric(10,2) not null,
-  qr_code text not null,
+  qr_code text unique not null,
   status text not null default 'issued' check (status in ('issued', 'redeemed', 'expired')),
+  expires_at date not null,
   issued_at timestamptz default now()
 );
 
