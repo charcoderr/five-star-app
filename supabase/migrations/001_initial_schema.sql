@@ -10,6 +10,9 @@ create table public.users (
   role text not null check (role in ('admin', 'diner', 'restaurant')),
   name text not null,
   phone text,
+  city text,
+  status text not null default 'active' check (status in ('active', 'pending_approval', 'suspended')),
+  application jsonb,
   created_at timestamptz default now()
 );
 
