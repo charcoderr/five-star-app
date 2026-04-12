@@ -7,9 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { colours } from '../../utils/theme';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -34,6 +36,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.container}>
+      <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
       <Text style={styles.title}>Reset Password</Text>
       <Text style={styles.subtitle}>Enter your email and we'll send you a reset link.</Text>
 
@@ -44,12 +47,12 @@ export default function ForgotPasswordScreen() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        placeholderTextColor="#999"
+        placeholderTextColor={colours.textMuted}
       />
 
       <TouchableOpacity style={styles.button} onPress={handleReset} disabled={loading}>
         {loading ? (
-          <ActivityIndicator color="#222" />
+          <ActivityIndicator color={colours.charcoalDark} />
         ) : (
           <Text style={styles.buttonText}>Send Reset Link</Text>
         )}
@@ -63,25 +66,13 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', paddingHorizontal: 32 },
-  title: { fontSize: 28, fontWeight: '700', color: '#222', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#777', marginBottom: 36 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#222',
-  },
-  button: {
-    backgroundColor: '#FFD700',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  buttonText: { fontSize: 16, fontWeight: '700', color: '#222' },
+  container: { flex: 1, backgroundColor: colours.offWhite, justifyContent: 'center', paddingHorizontal: 32 },
+  logo: { width: 180, height: 58, alignSelf: 'center', borderRadius: 6, marginBottom: 32 },
+  title: { fontSize: 26, fontWeight: '700', color: colours.textPrimary, marginBottom: 8 },
+  subtitle: { fontSize: 15, color: colours.textSecondary, marginBottom: 32 },
+  input: { backgroundColor: colours.white, borderWidth: 1, borderColor: colours.border, borderRadius: 10, padding: 14, marginBottom: 16, fontSize: 16, color: colours.textPrimary },
+  button: { backgroundColor: colours.gold, borderRadius: 10, padding: 16, alignItems: 'center' },
+  buttonText: { fontSize: 16, fontWeight: '700', color: colours.charcoalDark },
   backLink: { marginTop: 24, alignItems: 'center' },
-  backText: { color: '#666', fontSize: 14 },
+  backText: { color: colours.textSecondary, fontSize: 14 },
 });

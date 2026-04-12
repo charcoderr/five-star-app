@@ -9,9 +9,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { colours } from '../../utils/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -35,8 +37,14 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
-        <Text style={styles.logo}>⭐ Five Star</Text>
-        <Text style={styles.subtitle}>Mystery Dines</Text>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.tagline}>Mystery Customer Experience Experts</Text>
+        </View>
 
         <TextInput
           style={styles.input}
@@ -45,7 +53,7 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholderTextColor="#999"
+          placeholderTextColor={colours.textMuted}
         />
         <TextInput
           style={styles.input}
@@ -53,19 +61,19 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholderTextColor="#999"
+          placeholderTextColor={colours.textMuted}
         />
 
         <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colours.charcoalDark} />
           ) : (
             <Text style={styles.buttonText}>Log In</Text>
           )}
         </TouchableOpacity>
 
         <Link href="/(auth)/register" style={styles.link}>
-          New diner? Create an account
+          New diner? Apply to join
         </Link>
         <Link href="/(auth)/forgot-password" style={styles.link}>
           Forgot password?
@@ -76,26 +84,40 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: colours.offWhite },
   inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
-  logo: { fontSize: 40, textAlign: 'center', marginBottom: 4 },
-  subtitle: { fontSize: 18, textAlign: 'center', color: '#555', marginBottom: 40, fontWeight: '600' },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  logo: {
+    width: 220,
+    height: 70,
+    borderRadius: 8,
+  },
+  tagline: {
+    fontSize: 13,
+    color: colours.textSecondary,
+    marginTop: 10,
+    letterSpacing: 0.3,
+  },
   input: {
+    backgroundColor: colours.white,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colours.border,
     borderRadius: 10,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 14,
     fontSize: 16,
-    color: '#222',
+    color: colours.textPrimary,
   },
   button: {
-    backgroundColor: '#FFD700',
+    backgroundColor: colours.gold,
     borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginTop: 8,
   },
-  buttonText: { fontSize: 16, fontWeight: '700', color: '#222' },
-  link: { textAlign: 'center', marginTop: 20, color: '#666', fontSize: 14 },
+  buttonText: { fontSize: 16, fontWeight: '700', color: colours.charcoalDark },
+  link: { textAlign: 'center', marginTop: 20, color: colours.textSecondary, fontSize: 14 },
 });
