@@ -49,15 +49,51 @@ function AuthGuard() {
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (session && user && inAuthGroup) {
-      // Route to correct dashboard based on role
-      if (user.role === 'admin') router.replace('/(admin)/dashboard');
-      else if (user.role === 'diner') router.replace('/(diner)/home');
-      else if (user.role === 'restaurant') router.replace('/(restaurant)/dashboard');
+      return;
+    }
+
+    if (session && user && inAuthGroup) {
+      routeByRole(user);
     }
   }, [session, user, isLoading, segments]);
 
   return null;
+}
+
+async function routeByRole(user: AppUser) {
+  if (user.role === 'admin') {
+    router.replace('/(admin)/dashboard');
+    return;
+  }
+
+  if (user.role === 'restaurant') {
+    router.replace('/(restaurant)/dashboard');
+    return;
+  }
+
+  if (user.role === 'diner') {
+    // Check if pending approval
+    if ((user as any).status === 'pending_approval') {
+      router.replace('/(auth)/pending-approval');
+      return;
+    }
+
+    // Check if T&Cs have been signed
+    const { data: tcs } = await supabase
+      .from('tcs_agreements')
+      .select('id')
+      .eq('diner_id', user.id)
+      .order('signed_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!tcs) {
+      router.replace('/(auth)/terms');
+      return;
+    }
+
+    router.replace('/(diner)/home');
+  }
 }
 
 export default function RootLayout() {
