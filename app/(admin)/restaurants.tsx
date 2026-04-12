@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Alert, Modal, TextInput, ScrollView, RefreshControl,
 } from 'react-native';
+import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useAdminRestaurants, useCreateRestaurant } from '../../hooks/useAdmin';
+import { StatusPill } from '../../components/StatusPill';
+import { Avatar } from '../../components/Avatar';
+import { EmptyState } from '../../components/EmptyState';
+import { SearchFilterBar } from '../../components/SearchFilterBar';
+import { SUBSCRIPTION_STATUS, getStatus } from '../../utils/statusColors';
 
 function StarRating({ rating }: { rating: number | null }) {
   if (!rating) return <Text style={styles.noRating}>No rating yet</Text>;
@@ -17,11 +23,12 @@ function StarRating({ rating }: { rating: number | null }) {
   );
 }
 
-const SUB_CONFIG: Record<string, { label: string; colour: string }> = {
-  active:   { label: 'Active',  colour: colours.scoreGood },
-  inactive: { label: 'Inactive', colour: colours.error },
-  trial:    { label: 'Trial',   colour: colours.scoreFair },
-};
+const STATUS_FILTERS = [
+  { key: 'all',      label: 'All' },
+  { key: 'active',   label: 'Active' },
+  { key: 'trial',    label: 'Trial' },
+  { key: 'inactive', label: 'Inactive' },
+];
 
 export default function AdminRestaurants() {
   const { data: restaurants, isLoading, refetch, isRefetching } = useAdminRestaurants();
@@ -31,6 +38,23 @@ export default function AdminRestaurants() {
   const [address, setAddress] = useState('');
   const [cuisineType, setCuisineType] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusKey, setStatusKey] = useState('all');
+
+  const filtered = useMemo(() => {
+    const list = restaurants ?? [];
+    const q = query.trim().toLowerCase();
+    return list.filter((r: any) => {
+      if (statusKey !== 'all' && r.subscription_status !== statusKey) return false;
+      if (!q) return true;
+      return (
+        r.name?.toLowerCase().includes(q)
+        || r.cuisine_type?.toLowerCase().includes(q)
+        || r.address?.toLowerCase().includes(q)
+        || r.contact_email?.toLowerCase().includes(q)
+      );
+    });
+  }, [restaurants, query, statusKey]);
 
   async function handleCreate() {
     if (!name || !address || !contactEmail) {
@@ -54,41 +78,70 @@ export default function AdminRestaurants() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Restaurants</Text>
-          <Text style={styles.headerSub}>{restaurants?.length ?? 0} total</Text>
+          <Text style={styles.headerSub}>
+            {filtered.length} of {restaurants?.length ?? 0} shown
+          </Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
           <Text style={styles.addBtnText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
+      <SearchFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search by name, cuisine, address..."
+        chips={STATUS_FILTERS}
+        activeKey={statusKey}
+        onChipPress={setStatusKey}
+      />
+
       <FlatList
-        data={restaurants}
+        data={filtered}
         keyExtractor={item => item.id}
-        contentContainerStyle={restaurants?.length === 0 ? styles.emptyContainer : styles.list}
+        contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🍽️</Text>
-            <Text style={styles.emptyTitle}>No restaurants yet</Text>
-            <Text style={styles.emptySub}>Tap "+ Add" to add your first client restaurant.</Text>
-          </View>
+          <EmptyState
+            icon="🍽️"
+            title={query || statusKey !== 'all' ? 'No matches' : 'No restaurants yet'}
+            subtitle={
+              query || statusKey !== 'all'
+                ? 'Try a different search or filter.'
+                : 'Tap "+ Add" to add your first client restaurant.'
+            }
+            ctaLabel={!query && statusKey === 'all' ? '+ Add Restaurant' : undefined}
+            onCtaPress={!query && statusKey === 'all' ? () => setShowCreate(true) : undefined}
+          />
         }
         renderItem={({ item }) => {
-          const sub = SUB_CONFIG[item.subscription_status] ?? SUB_CONFIG.inactive;
+          const sub = getStatus(SUBSCRIPTION_STATUS, item.subscription_status);
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                router.push({
+                  pathname: '/(admin)/restaurant/[restaurantId]',
+                  params: { restaurantId: item.id },
+                })
+              }
+            >
               <View style={styles.cardRow}>
+                <Avatar name={item.name} size={48} tone="gold" />
                 <View style={styles.cardInfo}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.detail}>{item.cuisine_type}</Text>
+                  <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                  {item.cuisine_type ? (
+                    <Text style={styles.detail}>{item.cuisine_type}</Text>
+                  ) : null}
                   <Text style={styles.detail} numberOfLines={1}>{item.address}</Text>
                   <StarRating rating={item.avg_rating} />
                 </View>
-                <View style={[styles.subBadge, { backgroundColor: sub.colour + '22', borderColor: sub.colour }]}>
-                  <Text style={[styles.subText, { color: sub.colour }]}>{sub.label}</Text>
+                <View style={styles.cardRight}>
+                  <StatusPill status={sub} size="sm" />
+                  <Text style={styles.openCta}>View →</Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -121,27 +174,23 @@ export default function AdminRestaurants() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
   addBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   addBtnText: { fontSize: 14, fontWeight: '700', color: colours.charcoalDark },
   list: { padding: 16, gap: 10 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, textAlign: 'center' },
-  emptySub: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  emptyContainer: { flex: 1, justifyContent: 'center' },
   card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardInfo: { flex: 1, marginRight: 10 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardInfo: { flex: 1, gap: 2 },
+  cardRight: { alignItems: 'flex-end', gap: 8 },
+  openCta: { fontSize: 11, fontWeight: '700', color: colours.gold },
   name: { fontSize: 16, fontWeight: '700', color: colours.textPrimary },
-  detail: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
-  stars: { fontSize: 15, color: colours.gold, marginTop: 6 },
-  ratingNum: { fontSize: 13, color: colours.textSecondary },
-  noRating: { fontSize: 12, color: colours.textMuted, marginTop: 6, fontStyle: 'italic' },
-  subBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-start' },
-  subText: { fontSize: 11, fontWeight: '700' },
+  detail: { fontSize: 13, color: colours.textSecondary },
+  stars: { fontSize: 14, color: colours.gold, marginTop: 4 },
+  ratingNum: { fontSize: 12, color: colours.textSecondary },
+  noRating: { fontSize: 12, color: colours.textMuted, marginTop: 4, fontStyle: 'italic' },
 });
 
 const overlayStyles = StyleSheet.create({
