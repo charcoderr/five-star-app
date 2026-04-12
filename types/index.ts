@@ -6,6 +6,8 @@ export interface AppUser {
   role: UserRole;
   name: string;
   phone?: string;
+  city?: string;
+  status: 'active' | 'pending_approval' | 'suspended';
   created_at: string;
 }
 
@@ -39,9 +41,13 @@ export interface Assignment {
   slot?: Slot;
 }
 
+export type QuestionType = 'scored' | 'yes_no' | 'free_text';
+export type QuestionCategory = 'Booking' | 'External' | 'Internal' | 'Service' | 'Dining' | 'Facilities' | 'Conclusion';
+
 export interface ProformaQuestion {
   id: string;
-  type: 'yes_no' | 'star_rating' | 'number' | 'free_text';
+  type: QuestionType;
+  category: QuestionCategory;
   label: string;
   required: boolean;
   order: number;
@@ -56,12 +62,19 @@ export interface Proforma {
   created_at: string;
 }
 
+export interface ReportAnswer {
+  score?: number;       // 0–3 for scored questions
+  value?: boolean;      // for yes_no
+  text?: string;        // for free_text or notes on any question
+  notes?: string;       // additional notes on scored questions
+}
+
 export interface Report {
   id: string;
   assignment_id: string;
   diner_id: string;
   restaurant_id: string;
-  answers: Record<string, string | number | boolean>;
+  answers: Record<string, ReportAnswer>;
   submitted_at: string | null;
   status: 'draft' | 'submitted' | 'reviewed';
 }

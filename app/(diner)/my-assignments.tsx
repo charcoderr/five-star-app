@@ -1,13 +1,14 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useMyAssignments } from '../../hooks/useSlots';
 import { useAuthStore } from '../../stores/authStore';
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   pending:   { label: 'Awaiting Confirmation', colour: colours.scoreFair },
-  confirmed: { label: 'Confirmed',             colour: colours.scoreGood },
-  completed: { label: 'Completed',             colour: colours.charcoal },
-  cancelled: { label: 'Cancelled',             colour: colours.error },
+  confirmed: { label: 'Confirmed — Fill Report', colour: colours.scoreGood },
+  completed: { label: 'Completed',              colour: colours.charcoal },
+  cancelled: { label: 'Cancelled',              colour: colours.error },
 };
 
 export default function MyAssignments() {
@@ -45,8 +46,25 @@ export default function MyAssignments() {
           const status = STATUS_LABELS[item.status] ?? { label: item.status, colour: colours.textMuted };
           const slot = item.slot;
           const restaurant = slot?.restaurant;
+          const canFillReport = item.status === 'confirmed';
+
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                if (canFillReport) {
+                  router.push({
+                    pathname: '/(diner)/report/[assignmentId]',
+                    params: {
+                      assignmentId: item.id,
+                      restaurantId: restaurant?.id ?? '',
+                      restaurantName: restaurant?.name ?? 'Restaurant',
+                    },
+                  });
+                }
+              }}
+              disabled={!canFillReport}
+            >
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
                   <Text style={styles.restaurantName}>{restaurant?.name ?? '—'}</Text>
@@ -66,7 +84,10 @@ export default function MyAssignments() {
                   <Text style={styles.pillText}>🕐 {slot?.time?.slice(0, 5) ?? '—'}</Text>
                 </View>
               </View>
-            </View>
+              {canFillReport && (
+                <Text style={styles.tapHint}>Tap to fill in your report →</Text>
+              )}
+            </TouchableOpacity>
           );
         }}
       />
@@ -96,4 +117,5 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', gap: 8 },
   pill: { backgroundColor: colours.offWhite, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   pillText: { fontSize: 12, color: colours.textSecondary, fontWeight: '600' },
+  tapHint: { fontSize: 12, color: colours.gold, marginTop: 10, fontWeight: '600' },
 });
