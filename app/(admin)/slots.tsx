@@ -10,6 +10,8 @@ import { useIssueVoucher } from '../../hooks/useVouchers';
 import { useAuthStore } from '../../stores/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { useNotifyDinersForSlot, useNotifyDinersForSlots } from '../../hooks/useSmartNotify';
+import { useAllWaitlistCounts, useSlotWaitlist, useNotifyWaitlist } from '../../hooks/useWaitlist';
 
 const STATUS_COLOURS: Record<string, string> = {
   open:      colours.scoreGood,
@@ -19,13 +21,8 @@ const STATUS_COLOURS: Record<string, string> = {
 };
 
 const WEEKDAYS = [
-  { label: 'Mon', day: 1 },
-  { label: 'Tue', day: 2 },
-  { label: 'Wed', day: 3 },
-  { label: 'Thu', day: 4 },
-  { label: 'Fri', day: 5 },
-  { label: 'Sat', day: 6 },
-  { label: 'Sun', day: 0 },
+  { label: 'Mon', day: 1 }, { label: 'Tue', day: 2 }, { label: 'Wed', day: 3 },
+  { label: 'Thu', day: 4 }, { label: 'Fri', day: 5 }, { label: 'Sat', day: 6 }, { label: 'Sun', day: 0 },
 ];
 
 function useRestaurants() {
@@ -46,18 +43,41 @@ function generateSlotDates(startDate: string, endDate: string, weekdays: number[
   const end = new Date(endDate + 'T00:00:00');
   if (isNaN(current.getTime()) || isNaN(end.getTime())) return [];
   while (current <= end) {
-    if (weekdays.includes(current.getDay())) {
-      dates.push(current.toISOString().split('T')[0]);
-    }
+    if (weekdays.includes(current.getDay())) dates.push(current.toISOString().split('T')[0]);
     current.setDate(current.getDate() + 1);
   }
   return dates;
 }
 
-function AssignmentsModal({ slotId, onClose }: { slotId: string; onClose: () => void }) {
+function AssignmentsModal({
+  slotId,
+  slot,
+  onClose,
+}: {
+  slotId: string;
+  slot?: { date: string; time: string; restaurant?: { name: string } };
+  onClose: () => void;
+}) {
   const { data: assignments, isLoading } = useSlotAssignments(slotId);
+  const { data: waitlist } = useSlotWaitlist(slotId);
+  const notifyWaitlist = useNotifyWaitlist();
   const issueVoucher = useIssueVoucher();
   const [voucherValue, setVoucherValue] = useState<Record<string, string>>({});
+
+  async function handleNotifyWaitlist() {
+    if (!slot) return;
+    try {
+      const result = await notifyWaitlist.mutateAsync({
+        slotId,
+        restaurantName: slot.restaurant?.name ?? 'this restaurant',
+        slotDate: slot.date,
+        slotTime: slot.time,
+      });
+      Alert.alert('Notified!', `${result.notified} diner${result.notified !== 1 ? 's' : ''} on the waitlist have been alerted.`);
+    } catch {
+      Alert.alert('Error', 'Could not send notifications.');
+    }
+  }
 
   return (
     <View style={modalStyles.container}>
@@ -101,7 +121,7 @@ function AssignmentsModal({ slotId, onClose }: { slotId: string; onClose: () => 
                   }
                   try {
                     await issueVoucher.mutateAsync({ assignmentId: a.id, dinerId: a.diner_id, value });
-                    Alert.alert('Confirmed & Voucher Issued!', `${a.diner?.name} has been confirmed and a £${value} voucher has been sent to their app.`);
+                    Alert.alert('Confirmed & Voucher Issued!', `${a.diner?.name} confirmed and a £${value} voucher sent.`);
                     onClose();
                   } catch {
                     Alert.alert('Error', 'Could not confirm assignment. Please try again.');
@@ -116,6 +136,34 @@ function AssignmentsModal({ slotId, onClose }: { slotId: string; onClose: () => 
           </View>
         ))
       )}
+
+      {/* Waitlist section */}
+      {waitlist && waitlist.length > 0 && (
+        <View style={modalStyles.waitlistSection}>
+          <View style={modalStyles.waitlistHeader}>
+            <Text style={modalStyles.waitlistTitle}>Waitlist ({waitlist.length})</Text>
+            <TouchableOpacity
+              style={modalStyles.notifyBtn}
+              onPress={handleNotifyWaitlist}
+              disabled={notifyWaitlist.isPending}
+            >
+              {notifyWaitlist.isPending
+                ? <ActivityIndicator color={colours.charcoalDark} size="small" />
+                : <Text style={modalStyles.notifyBtnText}>Notify All</Text>}
+            </TouchableOpacity>
+          </View>
+          {waitlist.map((w, i) => (
+            <View key={w.id} style={modalStyles.waitlistRow}>
+              <Text style={modalStyles.waitlistPosition}>#{i + 1}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={modalStyles.waitlistName}>{w.diner?.name}</Text>
+                <Text style={modalStyles.waitlistEmail}>{w.diner?.email}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       <TouchableOpacity style={modalStyles.closeBtn} onPress={onClose}>
         <Text style={modalStyles.closeBtnText}>Close</Text>
       </TouchableOpacity>
@@ -127,17 +175,18 @@ export default function AdminSlots() {
   const { user } = useAuthStore();
   const { data: slots, isLoading, refetch, isRefetching } = useAllSlots();
   const { data: restaurants } = useRestaurants();
+  const { data: waitlistCounts } = useAllWaitlistCounts();
   const createSlot = useCreateSlot();
+  const notifySlot = useNotifyDinersForSlot();
+  const notifySlots = useNotifyDinersForSlots();
 
-  // Single slot modal
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<any | null>(null);
   const [restaurantId, setRestaurantId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [maxCovers, setMaxCovers] = useState('2');
 
-  // Bulk slot modal
   const [showBulk, setShowBulk] = useState(false);
   const [bulkRestaurantId, setBulkRestaurantId] = useState('');
   const [bulkWeekdays, setBulkWeekdays] = useState<number[]>([]);
@@ -153,36 +202,54 @@ export default function AdminSlots() {
   );
 
   function toggleWeekday(day: number) {
-    setBulkWeekdays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    setBulkWeekdays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  }
+
+  function resetSingleForm() { setRestaurantId(''); setDate(''); setTime(''); setMaxCovers('2'); }
+  function resetBulkForm() { setBulkRestaurantId(''); setBulkWeekdays([]); setBulkTime(''); setBulkMaxCovers('2'); setBulkStartDate(''); setBulkEndDate(''); }
+
+  function offerNotify(slotId: string, rId: string, slotDate: string, slotTime: string) {
+    const restaurant = restaurants?.find(r => r.id === rId);
+    Alert.alert(
+      'Slot created!',
+      `Notify matching diners? (active diners who haven't visited ${restaurant?.name ?? 'this restaurant'} recently)`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Notify',
+          onPress: async () => {
+            try {
+              const result = await notifySlot.mutateAsync({
+                restaurantId: rId,
+                restaurantName: restaurant?.name ?? '',
+                slotDate,
+                slotTime,
+                slotId,
+              });
+              Alert.alert('Sent!', `${result.notified} diner${result.notified !== 1 ? 's' : ''} notified.`);
+            } catch {
+              Alert.alert('Error', 'Could not send notifications. The slot was still created.');
+            }
+          },
+        },
+      ]
     );
   }
 
-  function resetSingleForm() {
-    setRestaurantId(''); setDate(''); setTime(''); setMaxCovers('2');
-  }
-
-  function resetBulkForm() {
-    setBulkRestaurantId(''); setBulkWeekdays([]); setBulkTime('');
-    setBulkMaxCovers('2'); setBulkStartDate(''); setBulkEndDate('');
-  }
-
   async function handleCreate() {
-    if (!restaurantId || !date || !time) {
-      Alert.alert('Please fill in all fields');
-      return;
-    }
+    if (!restaurantId || !date || !time) { Alert.alert('Please fill in all fields'); return; }
     try {
-      await createSlot.mutateAsync({
-        restaurant_id: restaurantId,
-        date,
-        time,
+      const created = await createSlot.mutateAsync({
+        restaurant_id: restaurantId, date, time,
         max_covers: parseInt(maxCovers, 10) || 2,
         created_by: user!.id,
       });
       setShowCreate(false);
+      const savedId = restaurantId;
+      const savedDate = date;
+      const savedTime = time;
       resetSingleForm();
-      Alert.alert('Slot created!', 'The slot is now visible to all diners.');
+      offerNotify(created.id, savedId, savedDate, savedTime);
     } catch {
       Alert.alert('Error', 'Could not create slot. Please try again.');
     }
@@ -194,33 +261,50 @@ export default function AdminSlots() {
       return;
     }
     if (bulkPreviewDates.length === 0) {
-      Alert.alert('No dates', 'The selected days produce no dates in the given range. Check start/end dates.');
+      Alert.alert('No dates', 'The selected days produce no dates in the given range.');
       return;
     }
     if (bulkPreviewDates.length > 52) {
-      Alert.alert(
-        'Too many slots',
-        `This would create ${bulkPreviewDates.length} slots. Narrow the date range or reduce weekday selection.`
-      );
+      Alert.alert('Too many slots', `This would create ${bulkPreviewDates.length} slots. Narrow the range.`);
       return;
     }
     setBulkCreating(true);
     try {
       const covers = parseInt(bulkMaxCovers, 10) || 2;
-      await Promise.all(
-        bulkPreviewDates.map(d =>
-          createSlot.mutateAsync({
-            restaurant_id: bulkRestaurantId,
-            date: d,
-            time: bulkTime,
-            max_covers: covers,
-            created_by: user!.id,
-          })
-        )
+      const createdSlots = await Promise.all(
+        bulkPreviewDates.map(d => createSlot.mutateAsync({
+          restaurant_id: bulkRestaurantId, date: d, time: bulkTime,
+          max_covers: covers, created_by: user!.id,
+        }))
       );
       setShowBulk(false);
+      const savedId = bulkRestaurantId;
       resetBulkForm();
-      Alert.alert('Done!', `${bulkPreviewDates.length} slots created and visible to diners.`);
+      const restaurant = restaurants?.find(r => r.id === savedId);
+      Alert.alert(
+        `${createdSlots.length} slots created!`,
+        `Notify matching diners about the new slots at ${restaurant?.name ?? 'this restaurant'}?`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Notify',
+            onPress: async () => {
+              try {
+                const result = await notifySlots.mutateAsync(
+                  createdSlots.map(s => ({
+                    restaurantId: savedId,
+                    restaurantName: restaurant?.name ?? '',
+                    slotId: s.id,
+                  }))
+                );
+                Alert.alert('Sent!', `${result.notified} diner${result.notified !== 1 ? 's' : ''} notified.`);
+              } catch {
+                Alert.alert('Error', 'Could not send notifications. Slots were still created.');
+              }
+            },
+          },
+        ]
+      );
     } catch {
       Alert.alert('Error', 'Some slots could not be created. Please try again.');
     } finally {
@@ -228,13 +312,7 @@ export default function AdminSlots() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colours.gold} size="large" />
-      </View>
-    );
-  }
+  if (isLoading) return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
 
   return (
     <View style={styles.container}>
@@ -265,62 +343,63 @@ export default function AdminSlots() {
             <Text style={styles.emptySub}>Tap "+ New" or "Bulk" to create slots.</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => item.status === 'claimed' ? setSelectedSlotId(item.id) : null}
-          >
-            <View style={styles.cardRow}>
-              <View style={styles.cardInfo}>
-                <Text style={styles.restaurantName}>{item.restaurant?.name}</Text>
-                <Text style={styles.dateTime}>
-                  {new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · {item.time?.slice(0, 5)}
-                </Text>
-                <Text style={styles.covers}>👥 Up to {item.max_covers} guests</Text>
+        renderItem={({ item }) => {
+          const waitingCount = waitlistCounts?.[item.id] ?? 0;
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => item.status === 'claimed' ? setSelectedSlot(item) : null}
+            >
+              <View style={styles.cardRow}>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.restaurantName}>{item.restaurant?.name}</Text>
+                  <Text style={styles.dateTime}>
+                    {new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · {item.time?.slice(0, 5)}
+                  </Text>
+                  <Text style={styles.covers}>👥 Up to {item.max_covers} guests</Text>
+                </View>
+                <View style={styles.cardRight}>
+                  <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
+                    <Text style={[styles.statusText, { color: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
+                      {item.status.toUpperCase()}
+                    </Text>
+                  </View>
+                  {waitingCount > 0 && (
+                    <View style={styles.waitlistBadge}>
+                      <Text style={styles.waitlistBadgeText}>{waitingCount} waiting</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
-                <Text style={[styles.statusText, { color: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
-                  {item.status.toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            {item.status === 'claimed' && (
-              <Text style={styles.tapHint}>Tap to review claim →</Text>
-            )}
-          </TouchableOpacity>
-        )}
+              {item.status === 'claimed' && (
+                <Text style={styles.tapHint}>Tap to review claim →</Text>
+              )}
+            </TouchableOpacity>
+          );
+        }}
       />
 
-      {/* ── Single Slot Modal ── */}
+      {/* Single Slot Modal */}
       <Modal visible={showCreate} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
           <ScrollView contentContainerStyle={overlayStyles.sheet}>
             <Text style={overlayStyles.title}>New Slot</Text>
-
             <Text style={overlayStyles.label}>Restaurant *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {restaurants?.map(r => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[overlayStyles.chip, restaurantId === r.id && overlayStyles.chipActive]}
-                    onPress={() => setRestaurantId(r.id)}
-                  >
+                  <TouchableOpacity key={r.id} style={[overlayStyles.chip, restaurantId === r.id && overlayStyles.chipActive]} onPress={() => setRestaurantId(r.id)}>
                     <Text style={[overlayStyles.chipText, restaurantId === r.id && overlayStyles.chipTextActive]}>{r.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-
             <Text style={overlayStyles.label}>Date * (YYYY-MM-DD)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 2025-08-15" value={date} onChangeText={setDate} placeholderTextColor={colours.textMuted} />
-
             <Text style={overlayStyles.label}>Time * (HH:MM)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 19:30" value={time} onChangeText={setTime} placeholderTextColor={colours.textMuted} />
-
             <Text style={overlayStyles.label}>Max Covers</Text>
             <TextInput style={overlayStyles.input} placeholder="2" value={maxCovers} onChangeText={setMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
-
             <TouchableOpacity style={overlayStyles.createBtn} onPress={handleCreate} disabled={createSlot.isPending}>
               {createSlot.isPending ? <ActivityIndicator color={colours.charcoalDark} /> : <Text style={overlayStyles.createBtnText}>Create Slot</Text>}
             </TouchableOpacity>
@@ -331,76 +410,50 @@ export default function AdminSlots() {
         </View>
       </Modal>
 
-      {/* ── Bulk Slot Modal ── */}
+      {/* Bulk Slot Modal */}
       <Modal visible={showBulk} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
           <ScrollView contentContainerStyle={overlayStyles.sheet}>
             <Text style={overlayStyles.title}>Bulk Create Slots</Text>
             <Text style={overlayStyles.subtitle}>Create recurring slots by selecting day(s) and a date range.</Text>
-
             <Text style={overlayStyles.label}>Restaurant *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {restaurants?.map(r => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[overlayStyles.chip, bulkRestaurantId === r.id && overlayStyles.chipActive]}
-                    onPress={() => setBulkRestaurantId(r.id)}
-                  >
+                  <TouchableOpacity key={r.id} style={[overlayStyles.chip, bulkRestaurantId === r.id && overlayStyles.chipActive]} onPress={() => setBulkRestaurantId(r.id)}>
                     <Text style={[overlayStyles.chipText, bulkRestaurantId === r.id && overlayStyles.chipTextActive]}>{r.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-
             <Text style={overlayStyles.label}>Day(s) of week *</Text>
             <View style={overlayStyles.weekdayRow}>
               {WEEKDAYS.map(w => (
-                <TouchableOpacity
-                  key={w.day}
-                  style={[overlayStyles.dayChip, bulkWeekdays.includes(w.day) && overlayStyles.dayChipActive]}
-                  onPress={() => toggleWeekday(w.day)}
-                >
-                  <Text style={[overlayStyles.dayChipText, bulkWeekdays.includes(w.day) && overlayStyles.dayChipTextActive]}>
-                    {w.label}
-                  </Text>
+                <TouchableOpacity key={w.day} style={[overlayStyles.dayChip, bulkWeekdays.includes(w.day) && overlayStyles.dayChipActive]} onPress={() => toggleWeekday(w.day)}>
+                  <Text style={[overlayStyles.dayChipText, bulkWeekdays.includes(w.day) && overlayStyles.dayChipTextActive]}>{w.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-
             <Text style={overlayStyles.label}>Time * (HH:MM)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 19:30" value={bulkTime} onChangeText={setBulkTime} placeholderTextColor={colours.textMuted} />
-
             <Text style={overlayStyles.label}>Max Covers</Text>
             <TextInput style={overlayStyles.input} placeholder="2" value={bulkMaxCovers} onChangeText={setBulkMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
-
             <Text style={overlayStyles.label}>Start Date * (YYYY-MM-DD)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 2025-09-01" value={bulkStartDate} onChangeText={setBulkStartDate} placeholderTextColor={colours.textMuted} />
-
             <Text style={overlayStyles.label}>End Date * (YYYY-MM-DD)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 2025-11-30" value={bulkEndDate} onChangeText={setBulkEndDate} placeholderTextColor={colours.textMuted} />
-
             {bulkPreviewDates.length > 0 && (
               <View style={overlayStyles.previewBox}>
-                <Text style={overlayStyles.previewText}>
-                  ✓ This will create <Text style={{ fontWeight: '700' }}>{bulkPreviewDates.length} slots</Text>
-                </Text>
-                <Text style={overlayStyles.previewSub}>
-                  {bulkPreviewDates[0]} → {bulkPreviewDates[bulkPreviewDates.length - 1]}
-                </Text>
+                <Text style={overlayStyles.previewText}>✓ This will create <Text style={{ fontWeight: '700' }}>{bulkPreviewDates.length} slots</Text></Text>
+                <Text style={overlayStyles.previewSub}>{bulkPreviewDates[0]} → {bulkPreviewDates[bulkPreviewDates.length - 1]}</Text>
               </View>
             )}
-
             <TouchableOpacity
               style={[overlayStyles.createBtn, bulkPreviewDates.length === 0 && overlayStyles.createBtnDisabled]}
               onPress={handleBulkCreate}
               disabled={bulkCreating || bulkPreviewDates.length === 0}
             >
-              {bulkCreating
-                ? <ActivityIndicator color={colours.charcoalDark} />
-                : <Text style={overlayStyles.createBtnText}>
-                    Create {bulkPreviewDates.length > 0 ? `${bulkPreviewDates.length} ` : ''}Slots
-                  </Text>}
+              {bulkCreating ? <ActivityIndicator color={colours.charcoalDark} /> : <Text style={overlayStyles.createBtnText}>Create {bulkPreviewDates.length > 0 ? `${bulkPreviewDates.length} ` : ''}Slots</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setShowBulk(false); resetBulkForm(); }} style={overlayStyles.cancelBtn}>
               <Text style={overlayStyles.cancelText}>Cancel</Text>
@@ -409,14 +462,18 @@ export default function AdminSlots() {
         </View>
       </Modal>
 
-      {/* ── Assignments Modal ── */}
-      <Modal visible={!!selectedSlotId} animationType="slide" transparent>
+      {/* Assignments + Waitlist Modal */}
+      <Modal visible={!!selectedSlot} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
-          <View style={overlayStyles.sheet}>
-            {selectedSlotId && (
-              <AssignmentsModal slotId={selectedSlotId} onClose={() => setSelectedSlotId(null)} />
+          <ScrollView contentContainerStyle={overlayStyles.sheet}>
+            {selectedSlot && (
+              <AssignmentsModal
+                slotId={selectedSlot.id}
+                slot={selectedSlot}
+                onClose={() => setSelectedSlot(null)}
+              />
             )}
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -443,11 +500,14 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardInfo: { flex: 1, marginRight: 10 },
+  cardRight: { alignItems: 'flex-end', gap: 6 },
   restaurantName: { fontSize: 16, fontWeight: '700', color: colours.textPrimary },
   dateTime: { fontSize: 13, color: colours.textSecondary, marginTop: 3 },
   covers: { fontSize: 13, color: colours.textMuted, marginTop: 3 },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   statusText: { fontSize: 11, fontWeight: '700' },
+  waitlistBadge: { backgroundColor: colours.scoreFair + '22', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colours.scoreFair },
+  waitlistBadgeText: { fontSize: 10, fontWeight: '700', color: colours.scoreFair },
   tapHint: { fontSize: 12, color: colours.gold, marginTop: 10, fontWeight: '600' },
 });
 
@@ -490,6 +550,15 @@ const modalStyles = StyleSheet.create({
   voucherInput: { backgroundColor: colours.offWhite, borderWidth: 1, borderColor: colours.border, borderRadius: 8, padding: 8, fontSize: 15, color: colours.textPrimary, width: 120 },
   confirmBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-end', minWidth: 80, alignItems: 'center' },
   confirmBtnText: { fontSize: 12, fontWeight: '700', color: colours.charcoalDark },
+  waitlistSection: { marginTop: 20, borderTopWidth: 1, borderTopColor: colours.border, paddingTop: 16 },
+  waitlistHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  waitlistTitle: { fontSize: 14, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6 },
+  notifyBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  notifyBtnText: { fontSize: 12, fontWeight: '700', color: colours.charcoalDark },
+  waitlistRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colours.border },
+  waitlistPosition: { fontSize: 14, fontWeight: '700', color: colours.gold, width: 24 },
+  waitlistName: { fontSize: 14, fontWeight: '600', color: colours.textPrimary },
+  waitlistEmail: { fontSize: 12, color: colours.textSecondary, marginTop: 1 },
   closeBtn: { alignItems: 'center', marginTop: 20, padding: 12 },
   closeBtnText: { fontSize: 14, color: colours.textMuted },
 });

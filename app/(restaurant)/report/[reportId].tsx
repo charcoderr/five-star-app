@@ -241,6 +241,27 @@ export default function RestaurantReportDetail() {
           ) : null}
         </View>
 
+        {((report as any).ai_summary || ((report as any).ai_recommendations?.length > 0)) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>AI Overview</Text>
+            {(report as any).ai_summary ? (
+              <Text style={styles.aiSummary}>{(report as any).ai_summary}</Text>
+            ) : null}
+            {(report as any).ai_recommendations?.length > 0 ? (
+              <View style={{ marginTop: 10 }}>
+                <Text style={styles.aiSubLabel}>Areas to focus on</Text>
+                <View style={styles.aiChips}>
+                  {((report as any).ai_recommendations as string[]).map((rec, i) => (
+                    <View key={i} style={styles.aiChip}>
+                      <Text style={styles.aiChipText}>{rec}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        )}
+
         {(report as any).admin_notes ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Notes from 5StarX</Text>
@@ -359,4 +380,9 @@ const styles = StyleSheet.create({
 
   badge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, alignSelf: 'flex-start' },
   badgeText: { fontSize: 11, fontWeight: '700' },
+  aiSummary: { fontSize: 14, color: colours.textPrimary, lineHeight: 21 },
+  aiSubLabel: { fontSize: 12, fontWeight: '700', color: colours.textSecondary, marginBottom: 6 },
+  aiChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  aiChip: { backgroundColor: colours.gold + '14', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: colours.gold + '44' },
+  aiChipText: { fontSize: 12, fontWeight: '600', color: colours.goldDark },
 });

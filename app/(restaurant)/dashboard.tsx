@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
@@ -15,10 +15,11 @@ import { EmptyState } from '../../components/EmptyState';
 import {
   SLOT_STATUS,
   REPORT_STATUS,
-  SUBSCRIPTION_STATUS,
   getStatus,
 } from '../../utils/statusColors';
 import { useSubscriptionStatus } from '../../hooks/useSubscription';
+import { useScoreTrend, usePlatformBenchmark } from '../../hooks/useTrends';
+import { TrendChart } from '../../components/TrendChart';
 
 function StatCard({
   value,
@@ -64,6 +65,9 @@ export default function RestaurantDashboard() {
   const { data: stats, isLoading, refetch, isRefetching } = useRestaurantStats(restaurantId);
   const { data: activity } = useRestaurantActivity(restaurantId, 6);
   const { data: sub } = useSubscriptionStatus(restaurantId || undefined);
+  const { data: trendData } = useScoreTrend(restaurantId || undefined);
+  const { data: benchmark } = usePlatformBenchmark();
+  const { width } = useWindowDimensions();
 
   if (!restaurantId) {
     return (
@@ -172,6 +176,15 @@ export default function RestaurantDashboard() {
         </TouchableOpacity>
       )}
 
+      {(trendData && trendData.length > 0) && (
+        <>
+          <Text style={styles.sectionTitle}>Score Trend (12 months)</Text>
+          <View style={styles.trendCard}>
+            <TrendChart data={trendData} benchmark={benchmark} width={width - 32} />
+          </View>
+        </>
+      )}
+
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       <View style={styles.activityCard}>
         {activity && activity.length > 0 ? (
@@ -240,4 +253,5 @@ const styles = StyleSheet.create({
   activityTitle: { fontSize: 14, fontWeight: '600', color: colours.textPrimary },
   activityDate: { fontSize: 12, color: colours.textMuted, marginTop: 2 },
   activityEmpty: { fontSize: 13, color: colours.textMuted, textAlign: 'center', paddingVertical: 20, fontStyle: 'italic' },
+  trendCard: { backgroundColor: colours.white, borderRadius: 14, marginHorizontal: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
 });

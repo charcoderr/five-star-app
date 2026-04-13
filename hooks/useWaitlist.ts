@@ -12,7 +12,7 @@ export function useSlotWaitlist(slotId: string) {
         .eq('slot_id', slotId)
         .order('position', { ascending: true });
       if (error) throw error;
-      return data as { id: string; position: number; created_at: string; diner: { id: string; name: string; email: string } }[];
+      return (data ?? []) as unknown as { id: string; position: number; created_at: string; diner: { id: string; name: string; email: string } }[];
     },
     enabled: !!slotId,
   });

@@ -115,6 +115,43 @@ export default function AdminReportDetail() {
           </View>
         </View>
 
+        {/* AI Summary */}
+        {(report.ai_summary || (report.ai_flags && report.ai_flags.length > 0) || (report.ai_recommendations && report.ai_recommendations.length > 0)) && (
+          <View style={styles.section}>
+            <View style={styles.aiHeader}>
+              <Text style={styles.sectionTitle}>AI Summary</Text>
+              <View style={styles.aiBadge}><Text style={styles.aiBadgeText}>Claude Haiku</Text></View>
+            </View>
+            {report.ai_summary ? (
+              <Text style={styles.aiSummaryText}>{report.ai_summary}</Text>
+            ) : null}
+            {report.ai_flags && report.ai_flags.length > 0 ? (
+              <View style={styles.aiChipSection}>
+                <Text style={styles.aiChipLabel}>⚠️ Flags</Text>
+                <View style={styles.aiChips}>
+                  {report.ai_flags.map((flag: string, i: number) => (
+                    <View key={i} style={[styles.aiChip, styles.aiChipRed]}>
+                      <Text style={[styles.aiChipText, { color: colours.error }]}>{flag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            {report.ai_recommendations && report.ai_recommendations.length > 0 ? (
+              <View style={styles.aiChipSection}>
+                <Text style={styles.aiChipLabel}>💡 Recommendations</Text>
+                <View style={styles.aiChips}>
+                  {report.ai_recommendations.map((rec: string, i: number) => (
+                    <View key={i} style={[styles.aiChip, styles.aiChipGold]}>
+                      <Text style={[styles.aiChipText, { color: colours.goldDark }]}>{rec}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        )}
+
         {/* Diner details */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Diner Details</Text>
@@ -276,4 +313,15 @@ const styles = StyleSheet.create({
   reviewBtnText: { fontSize: 15, fontWeight: '700', color: colours.charcoalDark },
   reviewedBanner: { backgroundColor: colours.scoreGood + '22', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colours.scoreGood },
   reviewedText: { fontSize: 15, fontWeight: '700', color: colours.scoreGood },
+  aiHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  aiBadge: { backgroundColor: colours.charcoalDark, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  aiBadgeText: { fontSize: 10, color: colours.gold, fontWeight: '700' },
+  aiSummaryText: { fontSize: 14, color: colours.textPrimary, lineHeight: 21, marginBottom: 10 },
+  aiChipSection: { marginTop: 8 },
+  aiChipLabel: { fontSize: 12, fontWeight: '700', color: colours.textSecondary, marginBottom: 6 },
+  aiChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  aiChip: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
+  aiChipRed: { backgroundColor: colours.error + '12', borderColor: colours.error + '44' },
+  aiChipGold: { backgroundColor: colours.gold + '14', borderColor: colours.gold + '44' },
+  aiChipText: { fontSize: 12, fontWeight: '600' },
 });
