@@ -102,7 +102,7 @@ export default function DinerNotifications() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState
-            icon="🔔"
+            icon="notifications-outline"
             title="No notifications yet"
             subtitle="We'll let you know when you have a new booking, voucher, or report update."
           />

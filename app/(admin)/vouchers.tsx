@@ -43,7 +43,7 @@ export default function AdminVouchers() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState
-            icon="🎟️"
+            icon="ticket-outline"
             title="No vouchers yet"
             subtitle="Vouchers are issued automatically when assignments are confirmed."
           />

@@ -130,7 +130,7 @@ export default function DinerHome() {
         keyExtractor={item => item.id}
         ListEmptyComponent={
           <EmptyState
-            icon="🍽️"
+            icon="restaurant-outline"
             title="No dines available right now"
             subtitle="Check back soon — Wendy posts new slots each month."
           />

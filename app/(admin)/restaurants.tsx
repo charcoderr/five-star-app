@@ -103,7 +103,7 @@ export default function AdminRestaurants() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState
-            icon="🍽️"
+            icon="restaurant-outline"
             title={query || statusKey !== 'all' ? 'No matches' : 'No restaurants yet'}
             subtitle={
               query || statusKey !== 'all'

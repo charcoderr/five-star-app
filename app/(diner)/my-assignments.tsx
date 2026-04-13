@@ -43,7 +43,7 @@ export default function MyAssignments() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="calendar-outline"
             title="No assignments yet"
             subtitle="Head to Available Dines to claim your first slot."
             ctaLabel="Browse Available Dines"

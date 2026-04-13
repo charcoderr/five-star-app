@@ -1,19 +1,23 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Tabs, router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colours } from '../../utils/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { useUnreadCount } from '../../hooks/useNotifications';
 
-function TabIcon({ icon }: { icon: string }) {
-  return <Text style={{ fontSize: 20 }}>{icon}</Text>;
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function tabIcon(name: IconName) {
+  return ({ color, focused }: { color: string; focused: boolean }) => (
+    <Ionicons name={name} size={focused ? 24 : 22} color={color} />
+  );
 }
 
 function BellIcon({ userId }: { userId: string | undefined }) {
   const unread = useUnreadCount(userId);
   return (
     <TouchableOpacity onPress={() => router.push('/(diner)/notifications')} style={bellStyles.btn}>
-      <Text style={bellStyles.icon}>🔔</Text>
+      <Ionicons name="notifications-outline" size={22} color={colours.white} />
       {unread > 0 && (
         <View style={bellStyles.badge}>
           <Text style={bellStyles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
@@ -25,20 +29,19 @@ function BellIcon({ userId }: { userId: string | undefined }) {
 
 const bellStyles = StyleSheet.create({
   btn: { marginRight: 16, position: 'relative' },
-  icon: { fontSize: 22 },
   badge: {
     position: 'absolute',
     top: -4,
     right: -6,
     backgroundColor: colours.error,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
-  badgeText: { fontSize: 9, fontWeight: '800', color: colours.white },
+  badgeText: { fontSize: 10, fontWeight: '800', color: colours.white },
 });
 
 export default function DinerLayout() {
@@ -53,8 +56,12 @@ export default function DinerLayout() {
         tabBarStyle: {
           backgroundColor: colours.charcoalDark,
           borderTopColor: colours.charcoal,
+          borderTopWidth: 0.5,
+          height: 86,
+          paddingTop: 8,
+          paddingBottom: 28,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.2, marginTop: 2 },
       }}
     >
       <Tabs.Screen
@@ -65,33 +72,15 @@ export default function DinerLayout() {
           headerStyle: { backgroundColor: colours.charcoalDark },
           headerTintColor: colours.white,
           headerTitle: '5StarX',
-          headerTitleStyle: { fontWeight: '800', fontSize: 20, color: colours.gold },
+          headerTitleStyle: { fontWeight: '800', fontSize: 20, color: colours.gold, letterSpacing: 0.5 },
           headerRight: () => <BellIcon userId={user?.id} />,
-          tabBarIcon: () => <TabIcon icon="🍽️" />,
+          tabBarIcon: tabIcon('restaurant-outline'),
         }}
       />
-      <Tabs.Screen
-        name="my-assignments"
-        options={{
-          title: 'My Dines',
-          tabBarIcon: () => <TabIcon icon="📅" />,
-        }}
-      />
-      <Tabs.Screen
-        name="vouchers"
-        options={{
-          title: 'Vouchers',
-          tabBarIcon: () => <TabIcon icon="🎟️" />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: () => <TabIcon icon="👤" />,
-        }}
-      />
-      {/* Hidden screens — navigated to programmatically */}
+      <Tabs.Screen name="my-assignments" options={{ title: 'My Dines',  tabBarIcon: tabIcon('calendar-outline') }} />
+      <Tabs.Screen name="vouchers"       options={{ title: 'Vouchers',  tabBarIcon: tabIcon('ticket-outline') }} />
+      <Tabs.Screen name="profile"        options={{ title: 'Profile',   tabBarIcon: tabIcon('person-outline') }} />
+      {/* Hidden — navigated to programmatically */}
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="report"        options={{ href: null }} />
     </Tabs>

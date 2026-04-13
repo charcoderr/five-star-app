@@ -40,7 +40,7 @@ export default function AdminReports() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="document-text-outline"
             title="No reports yet"
             subtitle="Reports will appear here once diners submit them."
           />

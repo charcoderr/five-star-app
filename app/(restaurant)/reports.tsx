@@ -88,7 +88,7 @@ export default function RestaurantReports() {
     return (
       <View style={styles.centered}>
         <EmptyState
-          icon="🏷️"
+          icon="pricetag-outline"
           title="No restaurant linked"
           subtitle="Ask Wendy to link your account to your restaurant."
         />
@@ -131,7 +131,7 @@ export default function RestaurantReports() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="📋"
+            icon="document-text-outline"
             title="No reports yet"
             subtitle="Completed mystery-diner reports will appear here once Wendy has reviewed them."
           />

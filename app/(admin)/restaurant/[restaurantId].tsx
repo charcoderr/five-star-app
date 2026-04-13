@@ -144,7 +144,7 @@ export default function RestaurantCrmDetail() {
   if (!data?.restaurant) {
     return (
       <View style={styles.centered}>
-        <EmptyState icon="🏚️" title="Restaurant not found" ctaLabel="Back" onCtaPress={() => router.back()} />
+        <EmptyState icon="sad-outline" title="Restaurant not found" ctaLabel="Back" onCtaPress={() => router.back()} />
       </View>
     );
   }

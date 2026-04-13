@@ -73,7 +73,7 @@ export default function RestaurantDashboard() {
     return (
       <View style={styles.centered}>
         <EmptyState
-          icon="🏷️"
+          icon="pricetag-outline"
           title="No restaurant linked"
           subtitle="Your account isn't linked to a restaurant yet. Ask Wendy to set this up from the admin panel."
         />
