@@ -18,6 +18,22 @@ export function useOpenSlots() {
   });
 }
 
+// Fetch claimed slots so diners can join the waitlist
+export function useClaimedSlots() {
+  return useQuery({
+    queryKey: ['slots', 'claimed'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('slots')
+        .select('*, restaurant:restaurants(id, name, address, cuisine_type, avg_rating)')
+        .eq('status', 'claimed')
+        .order('date', { ascending: true });
+      if (error) throw error;
+      return data as (Slot & { restaurant: any })[];
+    },
+  });
+}
+
 // Fetch all slots for admin view
 export function useAllSlots() {
   return useQuery({
