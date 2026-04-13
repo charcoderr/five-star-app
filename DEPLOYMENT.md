@@ -18,7 +18,6 @@ Copy the project ID into `app.json` → `extra.eas.projectId` and `updates.url`.
 ```
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://xxx.supabase.co"
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "eyJ..."
-eas secret:create --scope project --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "pk_live_..."
 ```
 
 ---
@@ -100,19 +99,31 @@ This updates all production users on next app launch.
 
 ---
 
-## Stripe — go-live checklist (Scott)
+## Billing — manual invoicing
 
-- [ ] Deploy `create-payment-intent` Edge Function with live Stripe secret key
-- [ ] Register Stripe webhook endpoint pointing to the Edge Function
-- [ ] Set webhook to listen for: `payment_intent.succeeded`, `customer.subscription.deleted`
-- [ ] Switch `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` EAS secret to `pk_live_...`
-- [ ] Test end-to-end with a real card before launch
+Five Star does not take card payments. Wendy invoices each restaurant client
+manually (bank transfer, Xero). Inside the app this means:
+
+- The restaurant's `subscription_status` / `subscription_plan` /
+  `subscription_renews_at` columns are the source of truth for feature gating
+- Wendy sets these from the admin CRM detail page (Billing section):
+  - Edit billing — enter monthly amount, interval, plan label, notes
+  - Invoice sent — stamps `last_invoice_sent_at` to today
+  - Payment received — flips status to `active`, stamps
+    `last_payment_received_at`, bumps `subscription_renews_at` forward by
+    the chosen interval
+- Restaurants see a read-only "Account" screen showing plan, next renewal
+  date, and a `billing@5starx.co.uk` contact link
+
+No Stripe, no webhook, no Edge Function needed for payments.
 
 ## Supabase — production checklist (Scott)
 
 - [ ] Create separate production Supabase project (don't use dev DB for prod)
-- [ ] Run all migrations (001, 002, 003) on production DB
+- [ ] Run all migrations (001 → 005) on production DB via `supabase db push`
 - [ ] Enable email confirmations in Auth settings
-- [ ] Set up pg_cron for scheduled notification Edge Functions
-- [ ] Configure storage bucket `report-photos` with correct RLS
+- [ ] Configure storage bucket `report-photos` with RLS policies (see BACKEND_SETUP.md)
+- [ ] Deploy Edge Functions (`notify`, `scheduled-reminders`, `summarise-report`)
+- [ ] Wire Supabase DB Webhooks for the notify function (see BACKEND_SETUP.md)
+- [ ] Schedule `scheduled-reminders` via pg_cron hourly
 - [ ] Set SMTP provider for transactional emails

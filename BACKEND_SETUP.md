@@ -12,9 +12,6 @@ All work lives in `supabase/` and corresponds to issue [#1](https://github.com/c
 brew install supabase/tap/supabase
 supabase --version   # need >= 1.200
 
-# Stripe CLI (for local webhook testing)
-brew install stripe/stripe-cli/stripe
-
 # Expo / EAS
 npm install -g eas-cli
 eas --version
@@ -38,15 +35,16 @@ supabase db push                     # applies all pending migrations
 supabase migration up 002_crm
 supabase migration up 003_notifications
 supabase migration up 004_ai_summaries
-supabase migration up 005_stripe
+supabase migration up 005_manual_invoicing
 ```
 
 Verify in the Supabase SQL editor:
 ```sql
 select column_name from information_schema.columns where table_name='reports' and column_name like 'ai_%';
 -- should return: ai_summary, ai_flags, ai_recommendations
-select column_name from information_schema.columns where table_name='restaurants' and column_name like 'stripe%';
--- should return: stripe_customer_id, stripe_subscription_id
+select column_name from information_schema.columns where table_name='restaurants'
+  and column_name in ('invoice_amount_pence','invoice_interval','last_invoice_sent_at','last_payment_received_at','billing_notes');
+-- should return all 5 columns
 ```
 
 ---
@@ -94,12 +92,7 @@ create policy "Diners read own report photos" on storage.objects
 ## 3. Set Edge Function secrets
 
 ```bash
-supabase secrets set \
-  STRIPE_SECRET_KEY=sk_live_xxx \
-  STRIPE_WEBHOOK_SECRET=whsec_xxx \
-  STRIPE_PRICE_STANDARD=price_xxx \
-  STRIPE_PRICE_PREMIUM=price_xxx \
-  ANTHROPIC_API_KEY=sk-ant-xxx
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxx
 
 # Verify
 supabase secrets list
@@ -112,14 +105,9 @@ supabase secrets list
 ## 4. Deploy Edge Functions
 
 ```bash
-# Functions that call back into Supabase auth-gated endpoints keep default JWT verification
-supabase functions deploy create-payment-intent
 supabase functions deploy notify
 supabase functions deploy scheduled-reminders
 supabase functions deploy summarise-report
-
-# Stripe webhook MUST skip JWT verification so Stripe can POST to it directly
-supabase functions deploy stripe-webhook --no-verify-jwt
 ```
 
 Get the public URL of each for the next steps:
@@ -129,35 +117,19 @@ https://<PROJECT_REF>.supabase.co/functions/v1/<function-name>
 
 ---
 
-## 5. Stripe dashboard
+## 5. Billing — manual invoicing (no Stripe)
 
-### 5a. Create the products + prices
-Stripe dashboard → **Products** → New:
+Five Star does not take card payments. Wendy invoices each restaurant
+client manually (bank transfer via Xero). The admin CRM detail page has a
+Billing section where she:
 
-| Product | Price | Recurring | Save the price ID |
-|---|---|---|---|
-| 5StarX Standard | £49 GBP | Monthly | `STRIPE_PRICE_STANDARD` |
-| 5StarX Premium | £99 GBP | Monthly | `STRIPE_PRICE_PREMIUM` |
+- Sets the amount (£), interval (monthly/quarterly/annual), plan label, notes
+- Hits **Invoice sent** when she emails an invoice
+- Hits **Payment received** when the money lands — this flips
+  `subscription_status` to `active` and bumps `subscription_renews_at`
+  forward by the chosen interval
 
-Copy each `price_xxx` ID back into the secrets (step 3).
-
-### 5b. Webhook endpoint
-Stripe dashboard → **Developers → Webhooks → Add endpoint**:
-- URL: `https://<PROJECT_REF>.supabase.co/functions/v1/stripe-webhook`
-- Events:
-  - `invoice.paid`
-  - `invoice.payment_failed`
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
-- Reveal signing secret → copy to `STRIPE_WEBHOOK_SECRET` (step 3).
-
-### 5c. Local test (optional)
-```bash
-stripe listen --forward-to http://localhost:54321/functions/v1/stripe-webhook
-# trigger a fake event:
-stripe trigger invoice.paid
-```
+No third-party secrets, webhooks, or Edge Functions required for payments.
 
 ---
 
@@ -236,7 +208,6 @@ Local `.env` (gitignored):
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://<REF>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx
 ```
 
 EAS secrets (for production builds):
@@ -244,7 +215,6 @@ EAS secrets (for production builds):
 eas login
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value https://<REF>.supabase.co
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <ANON_KEY>
-eas secret:create --scope project --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value pk_live_xxx
 eas secret:list
 ```
 
@@ -264,7 +234,7 @@ After deploys, run these end-to-end checks:
 | Admin marks report reviewed | Diner receives push "Wendy has reviewed your report" |
 | Voucher issued | Diner receives push "£X voucher ready" |
 | Hourly cron tick (manually invoke `scheduled-reminders`) | Assignments 24h away get reminder |
-| Restaurant subscribes via Stripe sheet | Webhook fires, `restaurants.subscription_status` → `active` |
+| Admin hits "Payment received" on CRM detail | `subscription_status` flips to `active`, `subscription_renews_at` bumps |
 
 Manual test invocations:
 ```bash
@@ -294,5 +264,4 @@ curl -X POST \
 
 - **Function logs**: Supabase dashboard → Edge Functions → pick a function → **Logs** tab
 - **DB webhook attempts**: Dashboard → Database → Webhooks → pick webhook → **Logs**
-- **Stripe events**: Stripe dashboard → Developers → Webhooks → endpoint → attempts
 - **pg_cron history**: `select * from cron.job_run_details order by start_time desc limit 20;`

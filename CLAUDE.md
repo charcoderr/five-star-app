@@ -22,7 +22,7 @@ Previously all operations were manual via email (Wendy sent slot lists, assigned
 | Server state | TanStack Query (React Query v5) |
 | Global state | Zustand (`stores/authStore.ts`) |
 | Forms | React Hook Form + Zod (installed, use for new forms) |
-| Payments | Stripe (`@stripe/stripe-react-native`) |
+| Payments | Manual invoicing (bank transfer via Xero — no Stripe) |
 | Notifications | `expo-notifications` + Supabase Edge Functions |
 | Photos | `expo-image-picker` → Supabase Storage bucket `report-photos` |
 | QR codes | `react-native-qrcode-svg` |
@@ -52,7 +52,7 @@ Auth guard lives in `app/_layout.tsx` → `routeByRole()`. Diners go through pen
 - `utils/theme.ts` — brand colours (`colours`) and `SCORE_LABELS`
 - `utils/statusColors.ts` — centralised status→label/colour maps for all entities
 - `utils/dineTimers.ts` — in-dine stopwatch timer definitions and scoring logic
-- `utils/stripe.ts` — subscription plan definitions (Standard £49, Premium £99)
+<!-- Billing: Wendy invoices restaurants manually; the subscription_status column is the source of truth and gets flipped from the admin CRM detail page. -->
 - `utils/defaultProforma.ts` — 42-question default checklist based on real Buck's Bar proforma
 
 ### Hooks (data layer)
@@ -62,7 +62,7 @@ Auth guard lives in `app/_layout.tsx` → `routeByRole()`. Diners go through pen
 - `hooks/useAdmin.ts` — dashboard stats, reports review, diner management, restaurant CRUD
 - `hooks/useCrm.ts` — restaurant/diner notes (Scott's CRM layer)
 - `hooks/useRestaurantPortal.ts` — restaurant-scoped queries (Scott)
-- `hooks/useSubscription.ts` — subscription status, payment intent, admin override
+- `hooks/useSubscription.ts` — subscription status, manual invoice/payment tracking, admin override
 - `hooks/useDineTimers.ts` — stopwatch state management with auto-cancel + haptics
 - `hooks/useNotifications.ts` — push token registration, in-app notification queries
 
@@ -138,18 +138,22 @@ ScoreExcellent: #C9A84C
 - `reports.tsx` — reviewed reports with search/sort
 - `report/[reportId].tsx` — report detail (diner identity hidden)
 - `proforma.tsx` — edit their checklist (add/remove questions)
-- `subscription.tsx` — plan selection + Stripe payment sheet
+- `account.tsx` — read-only subscription status + billing contact (Wendy invoices manually)
 
 ---
 
-## Pending backend work (Scott)
-See GitHub issue #1 for full details. Summary:
-1. **Supabase Edge Function** `create-payment-intent` — creates Stripe PaymentIntent, returns `{ clientSecret }`
-2. **Stripe webhook** — listens for `payment_intent.succeeded`, updates `subscription_status` to `active`
-3. **Push notification Edge Functions** — send via Expo Push API on: assignment confirmed, 24h reminder, morning-of reminder, voucher issued, report reviewed, new application
-4. **AI report summaries** — call Claude API (`claude-haiku-4-5`) on report submit, store result in `reports.ai_summary` + `reports.ai_flags`
-5. **Run migration 003** on Supabase (`notifications` table, `push_token` on users)
-6. **EAS login** and set EAS secrets (Supabase URL + anon key, Stripe publishable key)
+## Backend status (Scott)
+All Edge Functions and migrations are in-repo. See `BACKEND_SETUP.md` for the
+deployment runbook. Summary of what's built:
+
+1. **Migration 004** — AI summary columns on `reports` + reminder dedup columns on `assignments`
+2. **Migration 005** — manual invoicing columns on `restaurants` (amount, interval, last invoice/payment, notes)
+3. **Edge Function `notify`** — unified dispatcher for in-app notifications + Expo push. DB-webhook or direct invoke.
+4. **Edge Function `scheduled-reminders`** — hourly pg_cron job for 24h + morning-of reminders
+5. **Edge Function `summarise-report`** — Claude Haiku 4.5 call on report submit, writes summary/flags/recommendations
+6. **Billing (no Stripe)** — Wendy invoices manually; admin CRM detail page has Billing section to record invoice sent / payment received, which flips `subscription_status` and bumps `subscription_renews_at`
+
+Still to do on Supabase itself: apply migrations, deploy functions, wire the 5 DB webhooks, schedule pg_cron, set `ANTHROPIC_API_KEY` secret. All covered in `BACKEND_SETUP.md`.
 
 ---
 
@@ -179,5 +183,4 @@ eas update --branch production --message "description"
 ## Important constraints
 - Always use `--legacy-peer-deps` with npm install (React 19 peer dep conflict)
 - `expo-image-picker` uses `ImagePicker.MediaTypeOptions` (not `MediaType`)
-- Stripe `presentPaymentSheet` returns `{ error }` — check `error.code !== 'Canceled'` before showing alert
 - Timer auto-cancel uses `setTimeout` keyed by timer ID — always clear on reset/unmount
