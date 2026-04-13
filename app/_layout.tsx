@@ -6,12 +6,16 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { AppUser } from '../types';
 import { STRIPE_PUBLISHABLE_KEY } from '../utils/stripe';
+import { registerPushToken, useNotificationListeners } from '../hooks/useNotifications';
 
 const queryClient = new QueryClient();
 
 function AuthGuard() {
   const { session, user, isLoading, setSession, setUser, setLoading } = useAuthStore();
   const segments = useSegments();
+
+  // Set up push notification listeners (tap-to-navigate)
+  useNotificationListeners();
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -23,6 +27,8 @@ function AuthGuard() {
           .eq('id', session.user.id)
           .single();
         setUser(data as AppUser);
+        // Register push token for this device
+        registerPushToken(session.user.id).catch(() => {});
       }
       setLoading(false);
     });
@@ -36,6 +42,7 @@ function AuthGuard() {
           .eq('id', session.user.id)
           .single();
         setUser(data as AppUser);
+        registerPushToken(session.user.id).catch(() => {});
       } else {
         setUser(null);
       }
