@@ -21,6 +21,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="vouchers"    options={{ href: null }} />
       <Tabs.Screen name="tcs-editor"  options={{ href: null }} />
       <Tabs.Screen name="report"      options={{ href: null }} />
+      <Tabs.Screen name="restaurant"  options={{ href: null }} />
     </Tabs>
   );
 }

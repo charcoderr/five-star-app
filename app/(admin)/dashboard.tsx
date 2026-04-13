@@ -109,12 +109,12 @@ export default function AdminDashboard() {
       {/* Quick actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.quickActions}>
-        <QuickAction icon="📅" label="Post New Slot" onPress={() => router.push('/(admin)/slots')} />
-        <QuickAction icon="📋" label="Review Reports" onPress={() => router.push('/(admin)/reports')} />
-        <QuickAction icon="🍽️" label="Add Restaurant" onPress={() => router.push('/(admin)/restaurants')} />
-        <QuickAction icon="👤" label="Manage Diners" onPress={() => router.push('/(admin)/diners')} />
-        <QuickAction icon="📄" label="Edit T&Cs" onPress={() => router.push('/(admin)/tcs-editor')} />
-        <QuickAction icon="🎟️" label="All Vouchers" onPress={() => router.push('/(admin)/vouchers')} />
+        <QuickAction icon="📅" label="New Slot"     onPress={() => router.push('/(admin)/slots')} />
+        <QuickAction icon="📋" label="Reports"      onPress={() => router.push('/(admin)/reports')} />
+        <QuickAction icon="🍽️" label="Restaurants"  onPress={() => router.push('/(admin)/restaurants')} />
+        <QuickAction icon="👤" label="Diners"       onPress={() => router.push('/(admin)/diners')} />
+        <QuickAction icon="📄" label="T&Cs"         onPress={() => router.push('/(admin)/tcs-editor')} />
+        <QuickAction icon="🎟️" label="Vouchers"     onPress={() => router.push('/(admin)/vouchers')} />
       </View>
     </ScrollView>
   );
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 13, color: colours.textSecondary, marginTop: 4, fontWeight: '500' },
   statLabelAccent: { color: colours.charcoalDark },
   quickActions: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 10 },
-  quickAction: { width: '30%', flex: 1, backgroundColor: colours.white, borderRadius: 14, padding: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  quickActionIcon: { fontSize: 28, marginBottom: 8 },
-  quickActionLabel: { fontSize: 12, fontWeight: '600', color: colours.textSecondary, textAlign: 'center' },
+  quickAction: { width: '31.5%', minHeight: 100, backgroundColor: colours.white, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  quickActionIcon: { fontSize: 26, marginBottom: 6 },
+  quickActionLabel: { fontSize: 11, fontWeight: '600', color: colours.textSecondary, textAlign: 'center', lineHeight: 14 },
 });
