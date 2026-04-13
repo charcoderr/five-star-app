@@ -15,8 +15,10 @@ import { EmptyState } from '../../components/EmptyState';
 import {
   SLOT_STATUS,
   REPORT_STATUS,
+  SUBSCRIPTION_STATUS,
   getStatus,
 } from '../../utils/statusColors';
+import { useSubscriptionStatus } from '../../hooks/useSubscription';
 
 function StatCard({
   value,
@@ -61,6 +63,7 @@ export default function RestaurantDashboard() {
 
   const { data: stats, isLoading, refetch, isRefetching } = useRestaurantStats(restaurantId);
   const { data: activity } = useRestaurantActivity(restaurantId, 6);
+  const { data: sub } = useSubscriptionStatus(restaurantId || undefined);
 
   if (!restaurantId) {
     return (
@@ -147,7 +150,27 @@ export default function RestaurantDashboard() {
           <Text style={styles.quickActionIcon}>✏️</Text>
           <Text style={styles.quickActionLabel}>Edit Checklist</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(restaurant)/subscription')}>
+          <Text style={styles.quickActionIcon}>💳</Text>
+          <Text style={styles.quickActionLabel}>
+            {sub?.subscription_status === 'active' ? 'Subscription' : 'Subscribe'}
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {sub?.subscription_status !== 'active' && (
+        <TouchableOpacity
+          style={styles.subscriptionBanner}
+          onPress={() => router.push('/(restaurant)/subscription')}
+        >
+          <Text style={styles.subscriptionBannerTitle}>
+            {sub?.subscription_status === 'trial' ? 'You\'re on a free trial' : 'No active subscription'}
+          </Text>
+          <Text style={styles.subscriptionBannerBody}>
+            Subscribe to unlock full reports and analytics. →
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       <View style={styles.activityCard}>
@@ -206,6 +229,9 @@ const styles = StyleSheet.create({
   quickAction: { flex: 1, backgroundColor: colours.white, borderRadius: 14, padding: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   quickActionIcon: { fontSize: 26, marginBottom: 8 },
   quickActionLabel: { fontSize: 12, fontWeight: '600', color: colours.textSecondary, textAlign: 'center' },
+  subscriptionBanner: { marginHorizontal: 16, marginTop: 16, backgroundColor: colours.gold + '18', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colours.gold },
+  subscriptionBannerTitle: { fontSize: 14, fontWeight: '700', color: colours.goldDark },
+  subscriptionBannerBody: { fontSize: 13, color: colours.goldDark, marginTop: 2 },
 
   activityCard: { backgroundColor: colours.white, borderRadius: 14, marginHorizontal: 16, padding: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   activityRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4, gap: 12 },

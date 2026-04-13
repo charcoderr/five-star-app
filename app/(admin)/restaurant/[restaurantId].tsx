@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colours } from '../../../utils/theme';
@@ -21,6 +21,7 @@ import {
   USER_STATUS,
   getStatus,
 } from '../../../utils/statusColors';
+import { useSetSubscriptionStatus } from '../../../hooks/useSubscription';
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '—';
@@ -51,6 +52,23 @@ export default function RestaurantCrmDetail() {
   const { data: notes, isLoading: notesLoading } = useRestaurantNotes(restaurantId);
   const addNote = useAddRestaurantNote(restaurantId);
   const deleteNote = useDeleteRestaurantNote(restaurantId);
+  const setSubscription = useSetSubscriptionStatus();
+
+  function handleSubscriptionChange() {
+    const r = data?.restaurant;
+    if (!r) return;
+    const current = r.subscription_status ?? 'trial';
+    Alert.alert(
+      'Change Subscription',
+      `Current status: ${current.toUpperCase()}`,
+      [
+        { text: 'Set Active', onPress: () => setSubscription.mutateAsync({ restaurantId, status: 'active' }) },
+        { text: 'Set Trial',  onPress: () => setSubscription.mutateAsync({ restaurantId, status: 'trial' }) },
+        { text: 'Set Inactive', style: 'destructive', onPress: () => setSubscription.mutateAsync({ restaurantId, status: 'inactive' }) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={colours.gold} /></View>;
@@ -146,6 +164,15 @@ export default function RestaurantCrmDetail() {
             onPress={() => router.push('/(admin)/reports')}
           >
             <Text style={[styles.quickBtnText, styles.quickBtnTextSecondary]}>All Reports</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.quickBtnSecondary]}
+            onPress={handleSubscriptionChange}
+            disabled={setSubscription.isPending}
+          >
+            <Text style={[styles.quickBtnText, styles.quickBtnTextSecondary]}>
+              {setSubscription.isPending ? 'Saving…' : '💳 Subscription'}
+            </Text>
           </TouchableOpacity>
         </View>
 

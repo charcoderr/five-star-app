@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { Stack, router, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { AppUser } from '../types';
+import { STRIPE_PUBLISHABLE_KEY } from '../utils/stripe';
 
 const queryClient = new QueryClient();
 
@@ -98,9 +100,11 @@ async function routeByRole(user: AppUser) {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthGuard />
-      <Stack screenOptions={{ headerShown: false }} />
-    </QueryClientProvider>
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.5starx">
+      <QueryClientProvider client={queryClient}>
+        <AuthGuard />
+        <Stack screenOptions={{ headerShown: false }} />
+      </QueryClientProvider>
+    </StripeProvider>
   );
 }
