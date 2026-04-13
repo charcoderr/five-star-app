@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
 import { useRestaurantReportDetail } from '../../../hooks/useRestaurantPortal';
 import { useReportPhotos } from '../../../hooks/useProforma';
@@ -26,10 +29,134 @@ function formatDate(d: string | null | undefined, opts?: Intl.DateTimeFormatOpti
   }
 }
 
+function buildReportHtml(report: any, starRounded: number, starValue: number, total: number, max: number, scored: [string, any][], yesNo: [string, any][], text: [string, any][]) {
+  const visitDate = formatDate((report as any).assignment?.slot?.date);
+  const visitTime = (report as any).assignment?.slot?.time?.slice(0, 5) ?? '—';
+  const restaurantName = (report as any).restaurant?.name ?? 'Restaurant';
+  const adminNotes = (report as any).admin_notes ?? '';
+
+  const scorePalette = ['#D94F4F', '#F5A623', '#4CAF50', '#C9A84C'];
+  const scoreLabelsList = ['Poor', 'Fair', 'Good', 'Excellent'];
+
+  const breakdownRows = scoreLabelsList.map((label, i) => {
+    const count = scored.filter(([, a]) => a.score === i).length;
+    const pct = scored.length ? Math.round((count / scored.length) * 100) : 0;
+    return `
+      <tr>
+        <td style="padding:4px 8px;font-size:13px;color:#666;width:80px;">${label}</td>
+        <td style="padding:4px 8px;">
+          <div style="background:#eee;border-radius:3px;height:8px;width:200px;">
+            <div style="background:${scorePalette[i]};border-radius:3px;height:8px;width:${pct * 2}px;"></div>
+          </div>
+        </td>
+        <td style="padding:4px 8px;font-size:13px;color:#444;">${count}</td>
+      </tr>`;
+  }).join('');
+
+  const scoredRows = scored.map(([, a]) => `
+    <tr>
+      <td style="padding:6px 8px;">
+        <span style="background:${scorePalette[a.score] ?? '#999'}22;color:${scorePalette[a.score] ?? '#999'};border:1px solid ${scorePalette[a.score] ?? '#999'};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">
+          ${scoreLabelsList[a.score] ?? '—'}
+        </span>
+        ${a.notes ? `<div style="font-size:12px;color:#666;margin-top:3px;font-style:italic;">"${a.notes}"</div>` : ''}
+      </td>
+    </tr>`).join('');
+
+  const yesNoRows = yesNo.map(([, a]) => `
+    <tr>
+      <td style="padding:6px 8px;">
+        <span style="background:${a.value ? '#4CAF5022' : '#D94F4F22'};color:${a.value ? '#4CAF50' : '#D94F4F'};border:1px solid ${a.value ? '#4CAF50' : '#D94F4F'};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">
+          ${a.value ? 'Yes' : 'No'}
+        </span>
+      </td>
+    </tr>`).join('');
+
+  const textRows = text.map(([, a]) => `
+    <div style="background:#f8f8f6;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:14px;color:#333;font-style:italic;line-height:1.5;">
+      "${a.text}"
+    </div>`).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; background: #fff; }
+    .header { background: #2C2C2E; color: #fff; padding: 32px 40px 24px; }
+    .brand { color: #C9A84C; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+    .restaurant { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .meta { font-size: 13px; color: #aaa; }
+    .content { padding: 32px 40px; }
+    .score-card { background: #2C2C2E; color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center; }
+    .score-label { font-size: 11px; color: #aaa; letter-spacing: 1px; text-transform: uppercase; }
+    .stars { font-size: 36px; color: #C9A84C; margin: 8px 0 4px; }
+    .score-detail { font-size: 14px; color: #ddd; font-weight: 600; }
+    .section { margin-bottom: 28px; }
+    .section-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 14px; }
+    .notes-box { background: #C9A84C18; border-left: 3px solid #C9A84C; border-radius: 8px; padding: 12px 16px; font-size: 14px; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; }
+    .footer { background: #f8f8f6; padding: 20px 40px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">5STARX MYSTERY DINE REPORT</div>
+    <div class="restaurant">${restaurantName}</div>
+    <div class="meta">Visit: ${visitDate} at ${visitTime} &nbsp;·&nbsp; Generated: ${new Date().toLocaleDateString('en-GB')}</div>
+  </div>
+
+  <div class="content">
+    <div class="score-card">
+      <div class="score-label">Overall Rating</div>
+      <div class="stars">${max > 0 ? '★'.repeat(starRounded) + '☆'.repeat(5 - starRounded) : '—'}</div>
+      <div class="score-detail">${max > 0 ? `${total} / ${max} pts · ${starValue.toFixed(1)} / 5.0` : 'No scored questions'}</div>
+      ${max > 0 ? `
+      <div style="margin-top:20px;">
+        <table style="margin:0 auto;">
+          ${breakdownRows}
+        </table>
+      </div>` : ''}
+    </div>
+
+    ${adminNotes ? `
+    <div class="section">
+      <div class="section-title">Notes from 5StarX</div>
+      <div class="notes-box">${adminNotes}</div>
+    </div>` : ''}
+
+    ${scored.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Scored Questions (${scored.length})</div>
+      <table>${scoredRows}</table>
+    </div>` : ''}
+
+    ${yesNo.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Yes / No Questions</div>
+      <table>${yesNoRows}</table>
+    </div>` : ''}
+
+    ${text.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Written Feedback</div>
+      ${textRows}
+    </div>` : ''}
+  </div>
+
+  <div class="footer">
+    Confidential — prepared by 5StarX Mystery Dines &nbsp;·&nbsp; www.5starx.com
+  </div>
+</body>
+</html>`;
+}
+
 export default function RestaurantReportDetail() {
   const { reportId } = useLocalSearchParams<{ reportId: string }>();
   const { data: report, isLoading } = useRestaurantReportDetail(reportId);
   const { data: photos } = useReportPhotos(reportId);
+  const [exporting, setExporting] = useState(false);
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={colours.gold} /></View>;
@@ -48,6 +175,24 @@ export default function RestaurantReportDetail() {
   const starValue = max > 0 ? (total / max) * 5 : 0;
   const starRounded = Math.round(starValue);
 
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      const html = buildReportHtml(report, starRounded, starValue, total, max, scored, yesNo, text);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('PDF saved', `Report saved to: ${uri}`);
+      }
+    } catch (e) {
+      Alert.alert('Export failed', 'Could not generate PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -60,6 +205,11 @@ export default function RestaurantReportDetail() {
             Visit {formatDate((report as any).assignment?.slot?.date)} · {(report as any).assignment?.slot?.time?.slice(0,5) ?? '—'}
           </Text>
         </View>
+        <TouchableOpacity style={styles.pdfBtn} onPress={handleExportPdf} disabled={exporting}>
+          {exporting
+            ? <ActivityIndicator color={colours.gold} size="small" />
+            : <Text style={styles.pdfBtnText}>PDF</Text>}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -126,13 +276,7 @@ export default function RestaurantReportDetail() {
                     },
                   ]}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: a.value ? colours.scoreGood : colours.scorePoor,
-                    }}
-                  >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: a.value ? colours.scoreGood : colours.scorePoor }}>
                     {a.value ? 'Yes' : 'No'}
                   </Text>
                 </View>
@@ -179,6 +323,8 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colours.white },
   headerSub: { fontSize: 12, color: colours.charcoalLight, marginTop: 2 },
+  pdfBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: colours.gold, alignItems: 'center', justifyContent: 'center', minWidth: 50 },
+  pdfBtnText: { color: colours.gold, fontWeight: '700', fontSize: 13 },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 16 },

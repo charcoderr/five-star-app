@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { colours } from '../../utils/theme';
 import { useDiners, useApproveApplication, useRejectApplication } from '../../hooks/useAdmin';
+import { useDinerPerformanceMap, getBadgeTier, BADGE_CONFIG } from '../../hooks/useDinerStats';
 
 const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
   active:           { label: 'Active',          colour: colours.scoreGood },
@@ -14,15 +15,15 @@ const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
 
 export default function AdminDiners() {
   const { data: diners, isLoading, refetch, isRefetching } = useDiners();
+  const { data: perfMap } = useDinerPerformanceMap();
   const approve = useApproveApplication();
   const reject = useRejectApplication();
   const [selected, setSelected] = useState<any | null>(null);
 
   if (isLoading) return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
 
-  const pending = diners?.filter(d => d.status === 'pending_approval') ?? [];
-  const active = diners?.filter(d => d.status === 'active') ?? [];
-  const suspended = diners?.filter(d => d.status === 'suspended') ?? [];
+  const pending   = diners?.filter(d => d.status === 'pending_approval') ?? [];
+  const active    = diners?.filter(d => d.status === 'active') ?? [];
 
   return (
     <View style={styles.container}>
@@ -42,6 +43,10 @@ export default function AdminDiners() {
         renderItem={({ item }) => {
           const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.active;
           const isPending = item.status === 'pending_approval';
+          const perf = perfMap?.[item.id];
+          const badgeTier = perf ? getBadgeTier(perf.visits) : 'None';
+          const badge = BADGE_CONFIG[badgeTier];
+
           return (
             <TouchableOpacity style={[styles.card, isPending && styles.cardHighlight]} onPress={() => setSelected(item)}>
               <View style={styles.cardRow}>
@@ -49,9 +54,26 @@ export default function AdminDiners() {
                   <Text style={styles.avatarText}>{item.name?.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.cardInfo}>
-                  <Text style={styles.dinerName}>{item.name}</Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.dinerName}>{item.name}</Text>
+                    {badgeTier !== 'None' && (
+                      <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
+                    )}
+                  </View>
                   <Text style={styles.dinerEmail}>{item.email}</Text>
                   <Text style={styles.dinerCity}>{item.city}</Text>
+                  {perf && item.status === 'active' && (
+                    <View style={styles.perfRow}>
+                      <Text style={styles.perfStat}>
+                        {perf.visits} visit{perf.visits !== 1 ? 's' : ''}
+                      </Text>
+                      {perf.avgScore !== null && (
+                        <Text style={styles.perfStat}>
+                          · {perf.avgScore.toFixed(1)}★ avg
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: status.colour + '22', borderColor: status.colour }]}>
                   <Text style={[styles.statusText, { color: status.colour }]}>{status.label}</Text>
@@ -67,14 +89,43 @@ export default function AdminDiners() {
       <Modal visible={!!selected} animationType="slide" transparent>
         <View style={modalStyles.overlay}>
           <ScrollView contentContainerStyle={modalStyles.sheet}>
-            <Text style={modalStyles.name}>{selected?.name}</Text>
+            <View style={modalStyles.nameRow}>
+              <Text style={modalStyles.name}>{selected?.name}</Text>
+              {selected && (() => {
+                const perf = perfMap?.[selected.id];
+                const tier = perf ? getBadgeTier(perf.visits) : 'None';
+                if (tier === 'None') return null;
+                return (
+                  <View style={[modalStyles.badgePill, { backgroundColor: BADGE_CONFIG[tier].colour + '22', borderColor: BADGE_CONFIG[tier].colour }]}>
+                    <Text style={[modalStyles.badgePillText, { color: BADGE_CONFIG[tier].colour }]}>
+                      {BADGE_CONFIG[tier].emoji} {tier}
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
             <Text style={modalStyles.email}>{selected?.email} · {selected?.phone}</Text>
             <Text style={modalStyles.city}>{selected?.city}</Text>
+
+            {selected && perfMap?.[selected.id] && selected.status === 'active' && (
+              <View style={modalStyles.perfCard}>
+                <View style={modalStyles.perfStat}>
+                  <Text style={modalStyles.perfValue}>{perfMap[selected.id].visits}</Text>
+                  <Text style={modalStyles.perfLabel}>Visits</Text>
+                </View>
+                <View style={modalStyles.perfDivider} />
+                <View style={modalStyles.perfStat}>
+                  <Text style={modalStyles.perfValue}>
+                    {perfMap[selected.id].avgScore != null ? `${perfMap[selected.id].avgScore!.toFixed(1)}★` : '—'}
+                  </Text>
+                  <Text style={modalStyles.perfLabel}>Avg Score</Text>
+                </View>
+              </View>
+            )}
 
             {selected?.application && (
               <View style={modalStyles.appSection}>
                 <Text style={modalStyles.appTitle}>Application</Text>
-
                 <AppRow label="Food industry experience" value={selected.application.food_industry_experience ? `Yes — ${selected.application.food_industry_details || 'no details'}` : 'No'} />
                 <AppRow label="Previous mystery diner" value={selected.application.previous_mystery_diner ? `Yes — ${selected.application.previous_mystery_details || 'no details'}` : 'No'} />
                 <AppRow label="Attention to detail" value={selected.application.attention_to_detail ?? '—'} />
@@ -157,9 +208,13 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colours.gold, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 18, fontWeight: '700', color: colours.charcoalDark },
   cardInfo: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dinerName: { fontSize: 15, fontWeight: '700', color: colours.textPrimary },
+  badgeEmoji: { fontSize: 14 },
   dinerEmail: { fontSize: 12, color: colours.textSecondary, marginTop: 1 },
   dinerCity: { fontSize: 12, color: colours.textMuted, marginTop: 1 },
+  perfRow: { flexDirection: 'row', marginTop: 4, gap: 2 },
+  perfStat: { fontSize: 12, color: colours.gold, fontWeight: '600' },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   statusText: { fontSize: 11, fontWeight: '700' },
   reviewHint: { fontSize: 12, color: colours.gold, fontWeight: '600', marginTop: 8 },
@@ -168,9 +223,17 @@ const styles = StyleSheet.create({
 const modalStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: colours.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   name: { fontSize: 22, fontWeight: '700', color: colours.textPrimary },
+  badgePill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  badgePillText: { fontSize: 12, fontWeight: '700' },
   email: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
-  city: { fontSize: 13, color: colours.textMuted, marginTop: 2, marginBottom: 20 },
+  city: { fontSize: 13, color: colours.textMuted, marginTop: 2, marginBottom: 16 },
+  perfCard: { flexDirection: 'row', backgroundColor: colours.offWhite, borderRadius: 12, padding: 14, marginBottom: 16, alignItems: 'center' },
+  perfStat: { flex: 1, alignItems: 'center' },
+  perfDivider: { width: 1, height: 32, backgroundColor: colours.border },
+  perfValue: { fontSize: 20, fontWeight: '700', color: colours.textPrimary },
+  perfLabel: { fontSize: 11, fontWeight: '600', color: colours.textSecondary, marginTop: 2 },
   appSection: { borderTopWidth: 1, borderTopColor: colours.border, paddingTop: 16, marginBottom: 20 },
   appTitle: { fontSize: 14, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 14 },
   actionRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
