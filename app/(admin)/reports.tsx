@@ -1,0 +1,92 @@
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
+import { colours } from '../../utils/theme';
+import { useAllReports } from '../../hooks/useAdmin';
+
+const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
+  draft:     { label: 'Draft',     colour: colours.textMuted },
+  submitted: { label: 'Submitted', colour: colours.scoreFair },
+  reviewed:  { label: 'Reviewed',  colour: colours.scoreGood },
+};
+
+export default function AdminReports() {
+  const { data: reports, isLoading, refetch, isRefetching } = useAllReports();
+
+  if (isLoading) {
+    return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Reports</Text>
+        <Text style={styles.headerSub}>{reports?.filter(r => r.status === 'submitted').length ?? 0} awaiting review</Text>
+      </View>
+
+      <FlatList
+        data={reports}
+        keyExtractor={item => item.id}
+        contentContainerStyle={reports?.length === 0 ? styles.emptyContainer : styles.list}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyTitle}>No reports yet</Text>
+            <Text style={styles.emptySub}>Reports will appear here once diners submit them.</Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.draft;
+          return (
+            <TouchableOpacity
+              style={[styles.card, item.status === 'submitted' && styles.cardHighlight]}
+              onPress={() => router.push({ pathname: '/(admin)/report/[reportId]', params: { reportId: item.id } })}
+            >
+              <View style={styles.cardRow}>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.restaurantName}>{item.restaurant?.name ?? '—'}</Text>
+                  <Text style={styles.dinerName}>Diner: {item.diner?.name}</Text>
+                  <Text style={styles.date}>
+                    {item.submitted_at
+                      ? new Date(item.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'Not submitted'}
+                  </Text>
+                </View>
+                <View>
+                  <View style={[styles.statusBadge, { backgroundColor: status.colour + '22', borderColor: status.colour }]}>
+                    <Text style={[styles.statusText, { color: status.colour }]}>{status.label}</Text>
+                  </View>
+                  {item.status === 'submitted' && <Text style={styles.reviewCta}>Tap to review →</Text>}
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colours.offWhite },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
+  headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
+  headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
+  list: { padding: 16, gap: 10 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  empty: { alignItems: 'center' },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, textAlign: 'center' },
+  emptySub: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  cardHighlight: { borderLeftWidth: 4, borderLeftColor: colours.gold },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardInfo: { flex: 1, marginRight: 10 },
+  restaurantName: { fontSize: 16, fontWeight: '700', color: colours.textPrimary },
+  dinerName: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
+  date: { fontSize: 12, color: colours.textMuted, marginTop: 4 },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-end' },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  reviewCta: { fontSize: 11, color: colours.gold, fontWeight: '600', marginTop: 6, textAlign: 'right' },
+});
