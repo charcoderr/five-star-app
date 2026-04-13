@@ -40,3 +40,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# secrets — never commit these
+google-service-account.json
+*.p8
+GoogleService-Info.plist

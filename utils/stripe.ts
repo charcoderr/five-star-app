@@ -2,7 +2,7 @@
 // Publishable key is safe to include in client code.
 // Secret key MUST stay server-side (Supabase Edge Function).
 export const STRIPE_PUBLISHABLE_KEY =
-  'pk_test_REPLACE_WITH_YOUR_STRIPE_PUBLISHABLE_KEY';
+  process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_REPLACE_WITH_YOUR_STRIPE_PUBLISHABLE_KEY';
 
 // ─── Subscription plans ───────────────────────────────────────────────────────
 export interface SubscriptionPlan {

@@ -3,6 +3,9 @@
     "name": "5StarX",
     "slug": "5starx",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "scheme": "fivestar",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,23 +14,39 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2C2C2E"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.5starx.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.5starx.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to take photos as evidence for your mystery dine report.",
+        "NSPhotoLibraryUsageDescription": "Used to attach photos to your mystery dine report.",
+        "NSUserNotificationsUsageDescription": "We'll send you booking reminders and updates about your mystery dine assignments."
+      }
     },
     "android": {
       "package": "com.fivestarx.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2C2C2E"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/REPLACE_WITH_YOUR_EAS_PROJECT_ID"
     },
     "plugins": [
       "expo-router",
@@ -38,7 +57,19 @@
           "color": "#C9A84C",
           "sounds": []
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to attach photos to your mystery dine report.",
+          "cameraPermission": "Used to take photos as evidence for your mystery dine report."
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_YOUR_EAS_PROJECT_ID"
+      }
+    }
   }
 }
