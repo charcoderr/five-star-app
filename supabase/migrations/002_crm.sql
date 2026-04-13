@@ -16,7 +16,7 @@ alter table public.users
 -- T&Cs content (currently referenced by useTcsContent / useUpdateTcs)
 -- ============================================================
 create table if not exists public.tcs_content (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   content text not null,
   version integer not null,
   created_at timestamptz default now()
@@ -34,7 +34,7 @@ create policy "Admin can manage tcs content" on public.tcs_content
 -- Restaurant CRM notes (Wendy's notes on her restaurant clients)
 -- ============================================================
 create table if not exists public.restaurant_notes (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   restaurant_id uuid references public.restaurants(id) on delete cascade not null,
   author_id uuid references public.users(id) on delete set null,
   note_type text not null default 'general' check (note_type in ('general', 'admin', 'commercial')),
@@ -62,7 +62,7 @@ create policy "Restaurant reads own notes" on public.restaurant_notes
 -- Diner CRM notes (Wendy's internal notes on diner performance)
 -- ============================================================
 create table if not exists public.diner_notes (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   diner_id uuid references public.users(id) on delete cascade not null,
   author_id uuid references public.users(id) on delete set null,
   note_type text not null default 'general' check (note_type in ('general', 'admin', 'performance')),
@@ -83,7 +83,7 @@ create policy "Admin manages diner notes" on public.diner_notes
 -- Audit log — who did what, when
 -- ============================================================
 create table if not exists public.audit_log (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   actor_id uuid references public.users(id) on delete set null,
   actor_role text,
   action text not null,

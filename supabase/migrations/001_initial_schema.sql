@@ -1,7 +1,6 @@
 -- Five Star Mystery Dines — Initial Schema
 
--- Enable UUID extension
-create extension if not exists "uuid-ossp";
+-- Uses gen_random_uuid() (built-in pgcrypto/PG13+, no extension needed)
 
 -- Users (extends Supabase auth.users)
 create table public.users (
@@ -18,7 +17,7 @@ create table public.users (
 
 -- Restaurants
 create table public.restaurants (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   name text not null,
   address text,
   cuisine_type text,
@@ -30,7 +29,7 @@ create table public.restaurants (
 
 -- Slots (available mystery dine opportunities)
 create table public.slots (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   restaurant_id uuid references public.restaurants(id) on delete cascade not null,
   date date not null,
   time time not null,
@@ -42,7 +41,7 @@ create table public.slots (
 
 -- T&Cs agreements
 create table public.tcs_agreements (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   diner_id uuid references public.users(id) on delete cascade not null,
   signed_at timestamptz default now(),
   version integer not null default 1
@@ -50,7 +49,7 @@ create table public.tcs_agreements (
 
 -- Assignments (diner → slot)
 create table public.assignments (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   slot_id uuid references public.slots(id) on delete cascade not null,
   diner_id uuid references public.users(id) on delete cascade not null,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'cancelled')),
@@ -60,7 +59,7 @@ create table public.assignments (
 
 -- Proformas (dynamic checklists per restaurant)
 create table public.proformas (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   restaurant_id uuid references public.restaurants(id) on delete cascade not null,
   title text not null,
   questions jsonb not null default '[]',
@@ -70,7 +69,7 @@ create table public.proformas (
 
 -- Reports
 create table public.reports (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   assignment_id uuid references public.assignments(id) on delete cascade not null,
   diner_id uuid references public.users(id) not null,
   restaurant_id uuid references public.restaurants(id) not null,
@@ -82,7 +81,7 @@ create table public.reports (
 
 -- Report photos
 create table public.report_photos (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   report_id uuid references public.reports(id) on delete cascade not null,
   storage_path text not null,
   uploaded_at timestamptz default now()
@@ -90,7 +89,7 @@ create table public.report_photos (
 
 -- Vouchers
 create table public.vouchers (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   assignment_id uuid references public.assignments(id) on delete cascade not null,
   diner_id uuid references public.users(id) not null,
   value numeric(10,2) not null,
@@ -107,7 +106,7 @@ alter table public.assignments
 
 -- Ratings (calculated per report)
 create table public.ratings (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   restaurant_id uuid references public.restaurants(id) on delete cascade not null,
   report_id uuid references public.reports(id) on delete cascade not null,
   score numeric(3,2) not null check (score >= 1 and score <= 5),
