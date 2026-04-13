@@ -1,6 +1,5 @@
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
@@ -11,6 +10,8 @@ import {
   useMarkAllRead,
   AppNotification,
 } from '../../hooks/useNotifications';
+import { SkeletonList } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
 
 const TYPE_ICONS: Record<string, string> = {
   assignment_confirmed:  '✅',
@@ -66,7 +67,18 @@ export default function DinerNotifications() {
   }
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <View style={{ width: 80 }} />
+        </View>
+        <SkeletonList count={5} />
+      </View>
+    );
   }
 
   return (
@@ -89,13 +101,11 @@ export default function DinerNotifications() {
         contentContainerStyle={(notifications?.length ?? 0) === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🔔</Text>
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptyBody}>
-              We'll let you know when you have a new booking, voucher, or report update.
-            </Text>
-          </View>
+          <EmptyState
+            icon="🔔"
+            title="No notifications yet"
+            subtitle="We'll let you know when you have a new booking, voucher, or report update."
+          />
         }
         renderItem={({ item: n }) => (
           <TouchableOpacity
@@ -124,7 +134,6 @@ export default function DinerNotifications() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     paddingTop: 56,
     paddingBottom: 14,
@@ -140,10 +149,6 @@ const styles = StyleSheet.create({
   markAll: { fontSize: 13, color: colours.charcoalLight, paddingBottom: 2 },
   list: { padding: 16, gap: 8 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, marginBottom: 8 },
-  emptyBody: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', lineHeight: 20 },
   card: {
     backgroundColor: colours.white,
     borderRadius: 14,

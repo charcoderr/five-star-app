@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { colours } from '../../utils/theme';
 import { useAllVouchers } from '../../hooks/useVouchers';
 import { formatVoucherExpiry } from '../../utils/voucher';
+import { SkeletonList } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
 
 const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
   issued:   { label: 'Active',   colour: colours.scoreGood },
@@ -12,10 +14,20 @@ const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
 export default function AdminVouchers() {
   const { data: vouchers, isLoading, refetch, isRefetching } = useAllVouchers();
 
-  if (isLoading) return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
-
   const active = vouchers?.filter(v => v.status === 'issued').length ?? 0;
   const redeemed = vouchers?.filter(v => v.status === 'redeemed').length ?? 0;
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>All Vouchers</Text>
+          <Text style={styles.headerSub}>Loading…</Text>
+        </View>
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -30,10 +42,11 @@ export default function AdminVouchers() {
         contentContainerStyle={vouchers?.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🎟️</Text>
-            <Text style={styles.emptyTitle}>No vouchers yet</Text>
-          </View>
+          <EmptyState
+            icon="🎟️"
+            title="No vouchers yet"
+            subtitle="Vouchers are issued automatically when assignments are confirmed."
+          />
         }
         renderItem={({ item }) => {
           const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.issued;
@@ -66,15 +79,11 @@ export default function AdminVouchers() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
   list: { padding: 16, gap: 10 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary },
   card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardInfo: { flex: 1, marginRight: 12 },

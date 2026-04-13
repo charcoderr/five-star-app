@@ -1,8 +1,10 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useMyAssignments } from '../../hooks/useSlots';
 import { useAuthStore } from '../../stores/authStore';
+import { SkeletonList } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
   pending:   { label: 'Awaiting Confirmation', colour: colours.scoreFair },
@@ -17,8 +19,12 @@ export default function MyAssignments() {
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colours.gold} size="large" />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Dines</Text>
+          <Text style={styles.headerSub}>Your current and past assignments</Text>
+        </View>
+        <SkeletonList count={3} />
       </View>
     );
   }
@@ -36,11 +42,13 @@ export default function MyAssignments() {
         contentContainerStyle={assignments?.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyTitle}>No assignments yet</Text>
-            <Text style={styles.emptySub}>Head to Available Dines to claim your first slot.</Text>
-          </View>
+          <EmptyState
+            icon="📋"
+            title="No assignments yet"
+            subtitle="Head to Available Dines to claim your first slot."
+            ctaLabel="Browse Available Dines"
+            onCtaPress={() => router.push('/(diner)/home')}
+          />
         }
         renderItem={({ item }) => {
           const status = STATUS_LABELS[item.status] ?? { label: item.status, colour: colours.textMuted };
@@ -97,16 +105,11 @@ export default function MyAssignments() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.offWhite },
   header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
   list: { padding: 16, gap: 12 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, textAlign: 'center' },
-  emptySub: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
   card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   cardInfo: { flex: 1, marginRight: 10 },

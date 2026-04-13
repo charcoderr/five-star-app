@@ -1,12 +1,14 @@
 import {
-  View, Text, StyleSheet, FlatList, SectionList, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl,
+  View, Text, StyleSheet, SectionList, TouchableOpacity,
+  Alert, RefreshControl,
 } from 'react-native';
 import { colours } from '../../utils/theme';
 import { useOpenSlots, useClaimedSlots } from '../../hooks/useSlots';
 import { useAuthStore } from '../../stores/authStore';
 import { useClaimSlot } from '../../hooks/useSlots';
 import { useMyWaitlistEntries, useJoinWaitlist, useLeaveWaitlist } from '../../hooks/useWaitlist';
+import { SkeletonList } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
 
 function StarRating({ rating }: { rating: number | null }) {
   if (!rating) return <Text style={styles.noRating}>No rating yet</Text>;
@@ -95,7 +97,15 @@ export default function DinerHome() {
   }
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Available Dines</Text>
+          <Text style={styles.headerSub}>Tap a slot to claim your spot</Text>
+        </View>
+        <SkeletonList count={4} />
+      </View>
+    );
   }
 
   const hasOpen = (openSlots?.length ?? 0) > 0;
@@ -119,11 +129,11 @@ export default function DinerHome() {
         ]}
         keyExtractor={item => item.id}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🍽️</Text>
-            <Text style={styles.emptyTitle}>No dines available right now</Text>
-            <Text style={styles.emptySub}>Check back soon — Wendy posts new slots each month.</Text>
-          </View>
+          <EmptyState
+            icon="🍽️"
+            title="No dines available right now"
+            subtitle="Check back soon — Wendy posts new slots each month."
+          />
         }
         renderSectionHeader={({ section }) =>
           section.data.length > 0 ? (
@@ -205,16 +215,11 @@ export default function DinerHome() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.offWhite },
   header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
   list: { padding: 16, paddingTop: 8, gap: 0 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, textAlign: 'center' },
-  emptySub: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
   sectionHeader: { paddingTop: 16, paddingBottom: 8, paddingHorizontal: 4 },
   sectionHeaderText: { fontSize: 11, fontWeight: '700', color: colours.textSecondary, letterSpacing: 0.8 },
   sectionHeaderSub: { fontSize: 12, color: colours.textMuted, marginTop: 2 },

@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useAllReports } from '../../hooks/useAdmin';
+import { SkeletonList } from '../../components/Skeleton';
+import { EmptyState } from '../../components/EmptyState';
 
 const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
   draft:     { label: 'Draft',     colour: colours.textMuted },
@@ -13,7 +15,15 @@ export default function AdminReports() {
   const { data: reports, isLoading, refetch, isRefetching } = useAllReports();
 
   if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Reports</Text>
+          <Text style={styles.headerSub}>Loading…</Text>
+        </View>
+        <SkeletonList count={5} />
+      </View>
+    );
   }
 
   return (
@@ -29,11 +39,11 @@ export default function AdminReports() {
         contentContainerStyle={reports?.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyTitle}>No reports yet</Text>
-            <Text style={styles.emptySub}>Reports will appear here once diners submit them.</Text>
-          </View>
+          <EmptyState
+            icon="📋"
+            title="No reports yet"
+            subtitle="Reports will appear here once diners submit them."
+          />
         }
         renderItem={({ item }) => {
           const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.draft;
@@ -69,16 +79,11 @@ export default function AdminReports() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
   list: { padding: 16, gap: 10 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  empty: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, textAlign: 'center' },
-  emptySub: { fontSize: 14, color: colours.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 },
   card: { backgroundColor: colours.white, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   cardHighlight: { borderLeftWidth: 4, borderLeftColor: colours.gold },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
