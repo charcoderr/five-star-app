@@ -47,10 +47,12 @@ export type QuestionCategory = 'Booking' | 'External' | 'Internal' | 'Service' |
 export interface ProformaQuestion {
   id: string;
   type: QuestionType;
-  category: QuestionCategory;
+  category: string;       // string so restaurants can add custom sections
   label: string;
   required: boolean;
   order: number;
+  photoPrompt?: boolean;  // diner shown "Add photo" button under this question
+  locked?: boolean;       // cannot be removed (Wrap Up / Conclusion questions)
 }
 
 export interface Proforma {
@@ -67,6 +69,7 @@ export interface ReportAnswer {
   value?: boolean;      // for yes_no
   text?: string;        // for free_text or notes on any question
   notes?: string;       // additional notes on scored questions
+  photo_url?: string;   // signed URL for per-question photo (if photoPrompt)
 }
 
 export interface Report {

@@ -225,7 +225,7 @@ export default function ReportScreen() {
           if (!questions || questions.length === 0) return null;
 
           const { total, max } = sectionScore(questions, answers);
-          const isConclusion = category === 'Conclusion';
+          const isConclusion = category === 'Wrap Up';
 
           return (
             <View key={category} style={styles.section}>
