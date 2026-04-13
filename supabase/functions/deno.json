@@ -1,0 +1,10 @@
+{
+  "imports": {},
+  "tasks": {
+    "check": "deno check create-payment-intent/index.ts stripe-webhook/index.ts notify/index.ts scheduled-reminders/index.ts summarise-report/index.ts"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "deno.unstable"]
+  }
+}
