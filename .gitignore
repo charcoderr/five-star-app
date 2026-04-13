@@ -45,3 +45,7 @@ yarn-error.*
 google-service-account.json
 *.p8
 GoogleService-Info.plist
+
+# supabase CLI state
+supabase/.temp/
+supabase/.branches/
