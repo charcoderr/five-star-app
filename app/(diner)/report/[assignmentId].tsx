@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, Image,
@@ -12,8 +12,9 @@ import { ProformaQuestion, ReportAnswer } from '../../../types';
 import { PROFORMA_CATEGORIES } from '../../../utils/defaultProforma';
 import { useDineTimers } from '../../../hooks/useDineTimers';
 import DineTimerPanel from '../../../components/DineTimerPanel';
+import { supabase } from '../../../lib/supabase';
 
-// ─── Score Picker ────────────────────────────────────────────────────────────
+// ─── Score Picker ─────────────────────────────────────────────────────────────
 function ScorePicker({ value, onChange }: { value?: number; onChange: (v: number) => void }) {
   return (
     <View style={scoreStyles.row}>
@@ -40,7 +41,7 @@ const scoreStyles = StyleSheet.create({
   btnTextActive: { color: colours.charcoalDark },
 });
 
-// ─── Yes/No Picker ───────────────────────────────────────────────────────────
+// ─── Yes/No Picker ────────────────────────────────────────────────────────────
 function YesNoPicker({ value, onChange }: { value?: boolean; onChange: (v: boolean) => void }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
@@ -71,7 +72,79 @@ function sectionScore(questions: ProformaQuestion[], answers: Record<string, Rep
   return { total, max };
 }
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
+// ─── Per-question photo row ───────────────────────────────────────────────────
+function QuestionPhoto({
+  photoUrl,
+  uploading,
+  onPick,
+  prominent,
+}: {
+  photoUrl?: string;
+  uploading: boolean;
+  onPick: () => void;
+  prominent: boolean; // true = photoPrompt (always visible), false = subtle
+}) {
+  if (prominent) {
+    return (
+      <View style={photoStyles.prominentWrap}>
+        {photoUrl ? (
+          <View style={photoStyles.row}>
+            <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+            <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
+              {uploading
+                ? <ActivityIndicator color={colours.gold} size="small" />
+                : <Text style={photoStyles.replaceBtnText}>Replace photo</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={photoStyles.prominentBtn} onPress={onPick} disabled={uploading}>
+            {uploading
+              ? <ActivityIndicator color={colours.gold} size="small" />
+              : <>
+                  <Text style={photoStyles.prominentBtnIcon}>📷</Text>
+                  <Text style={photoStyles.prominentBtnText}>Add photo</Text>
+                </>
+            }
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  // Subtle: just show thumbnail if already uploaded, otherwise nothing (parent controls visibility)
+  if (!photoUrl) return null;
+  return (
+    <View style={photoStyles.subtleThumbWrap}>
+      <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+      <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
+        {uploading
+          ? <ActivityIndicator color={colours.gold} size="small" />
+          : <Text style={photoStyles.replaceBtnText}>Replace</Text>
+        }
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const photoStyles = StyleSheet.create({
+  prominentWrap: { marginTop: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  thumb: { width: 80, height: 80, borderRadius: 8, backgroundColor: colours.border },
+  replaceBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1.5, borderColor: colours.gold },
+  replaceBtnText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
+  prominentBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: colours.gold, borderStyle: 'dashed',
+    borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14,
+    alignSelf: 'flex-start',
+  },
+  prominentBtnIcon: { fontSize: 16 },
+  prominentBtnText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
+  subtleThumbWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function ReportScreen() {
   const { assignmentId, restaurantId, restaurantName } = useLocalSearchParams<{
     assignmentId: string;
@@ -90,6 +163,10 @@ export default function ReportScreen() {
 
   const [answers, setAnswers] = useState<Record<string, ReportAnswer>>({});
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
+  // Track which non-photoPrompt questions have their extras panel open
+  const [expandedExtras, setExpandedExtras] = useState<Set<string>>(new Set());
+  // Track which question is currently uploading a per-question photo
+  const [uploadingQuestionId, setUploadingQuestionId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dineTimers = useDineTimers();
 
@@ -103,14 +180,57 @@ export default function ReportScreen() {
   function updateAnswer(questionId: string, partial: Partial<ReportAnswer>) {
     const updated = { ...answers, [questionId]: { ...answers[questionId], ...partial } };
     setAnswers(updated);
-    // Auto-save after 2s of inactivity
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       if (report) saveDraft.mutate({ reportId: report.id, answers: updated });
     }, 2000);
   }
 
-  async function pickPhoto() {
+  function toggleExtras(questionId: string) {
+    setExpandedExtras(prev => {
+      const next = new Set(prev);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
+  }
+
+  // Upload a photo attached to a specific question — stores URL in answers[questionId].photo_url
+  async function pickQuestionPhoto(questionId: string) {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled || !result.assets[0] || !report) return;
+
+    const uri = result.assets[0].uri;
+    setUploadingQuestionId(questionId);
+    try {
+      const filename = `${report.id}/q_${questionId}_${Date.now()}.jpg`;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('report-photos')
+        .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('report-photos').getPublicUrl(filename);
+      updateAnswer(questionId, { photo_url: urlData.publicUrl });
+    } catch {
+      Alert.alert('Upload failed', 'Could not upload this photo. Please try again.');
+    } finally {
+      setUploadingQuestionId(null);
+    }
+  }
+
+  // Upload a general report photo (Wrap Up gallery)
+  async function pickGeneralPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
@@ -132,7 +252,6 @@ export default function ReportScreen() {
   async function handleSubmit() {
     if (!report || !proforma) return;
 
-    // Check required questions
     const unanswered = proforma.questions.filter(q => {
       if (!q.required) return false;
       const a = answers[q.id];
@@ -186,7 +305,11 @@ export default function ReportScreen() {
     );
   }
 
-  const questionsByCategory = PROFORMA_CATEGORIES.reduce((acc, cat) => {
+  // Build category map — also include any custom categories not in PROFORMA_CATEGORIES
+  const allCategories = Array.from(
+    new Set([...PROFORMA_CATEGORIES, ...proforma.questions.map(q => q.category)])
+  );
+  const questionsByCategory = allCategories.reduce((acc, cat) => {
     acc[cat] = proforma.questions.filter(q => q.category === cat).sort((a, b) => a.order - b.order);
     return acc;
   }, {} as Record<string, ProformaQuestion[]>);
@@ -208,7 +331,7 @@ export default function ReportScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {/* ── In-dine timers (optional) ──────────────────────────────────── */}
+        {/* In-dine timers */}
         <DineTimerPanel
           enabled={dineTimers.enabled}
           onToggleEnabled={dineTimers.setEnabled}
@@ -220,35 +343,75 @@ export default function ReportScreen() {
           onReset={dineTimers.resetTimer}
         />
 
-        {PROFORMA_CATEGORIES.map(category => {
+        {allCategories.map(category => {
           const questions = questionsByCategory[category];
           if (!questions || questions.length === 0) return null;
 
           const { total, max } = sectionScore(questions, answers);
-          const isConclusion = category === 'Wrap Up';
+          const isWrapUp = category === 'Wrap Up';
 
           return (
             <View key={category} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>{category}</Text>
-                {!isConclusion && max > 0 && (
+                {!isWrapUp && max > 0 && (
                   <Text style={styles.sectionScore}>{total} / {max}</Text>
                 )}
               </View>
 
-              {questions.map(q => (
-                <View key={q.id} style={styles.question}>
-                  <Text style={styles.questionLabel}>
-                    {q.label}
-                    {q.required && <Text style={styles.required}> *</Text>}
-                  </Text>
+              {questions.map(q => {
+                const extrasOpen = expandedExtras.has(q.id);
+                const hasQuestionPhoto = !!answers[q.id]?.photo_url;
+                const isUploadingThis = uploadingQuestionId === q.id;
 
-                  {q.type === 'scored' && (
-                    <>
+                return (
+                  <View key={q.id} style={styles.question}>
+                    {/* Question label + subtle photo toggle (non-photoPrompt only) */}
+                    <View style={styles.questionLabelRow}>
+                      <Text style={[styles.questionLabel, { flex: 1 }]}>
+                        {q.label}
+                        {q.required && <Text style={styles.required}> *</Text>}
+                      </Text>
+                      {!q.photoPrompt && (
+                        <TouchableOpacity
+                          style={[styles.subtlePhotoBtn, (extrasOpen || hasQuestionPhoto) && styles.subtlePhotoBtnActive]}
+                          onPress={() => toggleExtras(q.id)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={[styles.subtlePhotoBtnText, (extrasOpen || hasQuestionPhoto) && styles.subtlePhotoBtnTextActive]}>
+                            📷
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Answer inputs */}
+                    {q.type === 'scored' && (
                       <ScorePicker
                         value={answers[q.id]?.score}
                         onChange={score => updateAnswer(q.id, { score })}
                       />
+                    )}
+                    {q.type === 'yes_no' && (
+                      <YesNoPicker
+                        value={answers[q.id]?.value}
+                        onChange={value => updateAnswer(q.id, { value })}
+                      />
+                    )}
+                    {q.type === 'free_text' && (
+                      <TextInput
+                        style={[styles.notesInput, styles.freeText]}
+                        placeholder="Write your response..."
+                        value={answers[q.id]?.text ?? ''}
+                        onChangeText={text => updateAnswer(q.id, { text })}
+                        placeholderTextColor={colours.textMuted}
+                        multiline
+                        numberOfLines={4}
+                      />
+                    )}
+
+                    {/* Notes field for scored questions */}
+                    {q.type === 'scored' && (
                       <TextInput
                         style={styles.notesInput}
                         placeholder="Notes (optional)"
@@ -257,45 +420,63 @@ export default function ReportScreen() {
                         placeholderTextColor={colours.textMuted}
                         multiline
                       />
-                    </>
-                  )}
+                    )}
 
-                  {q.type === 'yes_no' && (
-                    <YesNoPicker
-                      value={answers[q.id]?.value}
-                      onChange={value => updateAnswer(q.id, { value })}
-                    />
-                  )}
+                    {/* Prominent photo prompt — always visible for photoPrompt questions */}
+                    {q.photoPrompt && (
+                      <QuestionPhoto
+                        photoUrl={answers[q.id]?.photo_url}
+                        uploading={isUploadingThis}
+                        onPick={() => pickQuestionPhoto(q.id)}
+                        prominent
+                      />
+                    )}
 
-                  {q.type === 'free_text' && (
-                    <TextInput
-                      style={[styles.notesInput, styles.freeText]}
-                      placeholder="Write your response..."
-                      value={answers[q.id]?.text ?? ''}
-                      onChangeText={text => updateAnswer(q.id, { text })}
-                      placeholderTextColor={colours.textMuted}
-                      multiline
-                      numberOfLines={4}
-                    />
-                  )}
-                </View>
-              ))}
+                    {/* Subtle extras panel — shown when toggled or photo already attached */}
+                    {!q.photoPrompt && (extrasOpen || hasQuestionPhoto) && (
+                      <View style={styles.extrasPanel}>
+                        {hasQuestionPhoto ? (
+                          <QuestionPhoto
+                            photoUrl={answers[q.id]?.photo_url}
+                            uploading={isUploadingThis}
+                            onPick={() => pickQuestionPhoto(q.id)}
+                            prominent={false}
+                          />
+                        ) : (
+                          <TouchableOpacity
+                            style={photoStyles.prominentBtn}
+                            onPress={() => pickQuestionPhoto(q.id)}
+                            disabled={isUploadingThis}
+                          >
+                            {isUploadingThis
+                              ? <ActivityIndicator color={colours.gold} size="small" />
+                              : <>
+                                  <Text style={photoStyles.prominentBtnIcon}>📷</Text>
+                                  <Text style={photoStyles.prominentBtnText}>Add photo</Text>
+                                </>
+                            }
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
 
-              {/* Photo upload in Conclusion */}
-              {isConclusion && (
+              {/* Wrap Up general photo gallery */}
+              {isWrapUp && (
                 <View style={styles.photoSection}>
-                  <Text style={styles.photoTitle}>Photos</Text>
-                  <Text style={styles.photoSub}>Upload photos as evidence of your visit (receipts, food, venue).</Text>
+                  <Text style={styles.photoTitle}>Additional Photos</Text>
+                  <Text style={styles.photoSub}>Upload any other photos as evidence — receipts, food, venue.</Text>
                   <View style={styles.photoGrid}>
                     {allPhotos.map((uri, i) => (
                       <Image key={i} source={{ uri }} style={styles.photoThumb} />
                     ))}
-                    <TouchableOpacity style={styles.addPhotoBtn} onPress={pickPhoto} disabled={uploadPhoto.isPending}>
-                      {uploadPhoto.isPending ? (
-                        <ActivityIndicator color={colours.gold} size="small" />
-                      ) : (
-                        <Text style={styles.addPhotoIcon}>+</Text>
-                      )}
+                    <TouchableOpacity style={styles.addPhotoBtn} onPress={pickGeneralPhoto} disabled={uploadPhoto.isPending}>
+                      {uploadPhoto.isPending
+                        ? <ActivityIndicator color={colours.gold} size="small" />
+                        : <Text style={styles.addPhotoIcon}>+</Text>
+                      }
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -310,11 +491,10 @@ export default function ReportScreen() {
           onPress={handleSubmit}
           disabled={submitReport.isPending}
         >
-          {submitReport.isPending ? (
-            <ActivityIndicator color={colours.charcoalDark} />
-          ) : (
-            <Text style={styles.submitBtnText}>Submit Report</Text>
-          )}
+          {submitReport.isPending
+            ? <ActivityIndicator color={colours.charcoalDark} />
+            : <Text style={styles.submitBtnText}>Submit Report</Text>
+          }
         </TouchableOpacity>
         <View style={styles.bottomPad} />
       </ScrollView>
@@ -340,11 +520,17 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colours.charcoalDark, paddingHorizontal: 16, paddingVertical: 10 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colours.gold, textTransform: 'uppercase', letterSpacing: 0.8 },
   sectionScore: { fontSize: 13, fontWeight: '700', color: colours.white },
-  question: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colours.border },
+  question: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colours.border },
+  questionLabelRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   questionLabel: { fontSize: 14, color: colours.textPrimary, lineHeight: 20, fontWeight: '500' },
   required: { color: colours.error },
+  subtlePhotoBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: colours.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.offWhite, marginTop: 1 },
+  subtlePhotoBtnActive: { borderColor: colours.gold, backgroundColor: '#FDF8EC' },
+  subtlePhotoBtnText: { fontSize: 14, opacity: 0.4 },
+  subtlePhotoBtnTextActive: { opacity: 1 },
   notesInput: { marginTop: 8, backgroundColor: colours.offWhite, borderRadius: 8, borderWidth: 1, borderColor: colours.border, padding: 10, fontSize: 13, color: colours.textPrimary, minHeight: 38 },
   freeText: { minHeight: 90, textAlignVertical: 'top' },
+  extrasPanel: { marginTop: 10 },
   photoSection: { padding: 16, borderTopWidth: 1, borderTopColor: colours.border },
   photoTitle: { fontSize: 14, fontWeight: '700', color: colours.textPrimary, marginBottom: 4 },
   photoSub: { fontSize: 13, color: colours.textSecondary, marginBottom: 12 },
