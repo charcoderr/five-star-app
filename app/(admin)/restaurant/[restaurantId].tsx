@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Alert,
+  ActivityIndicator, RefreshControl, Alert, Modal, TextInput,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colours } from '../../../utils/theme';
@@ -21,7 +22,12 @@ import {
   USER_STATUS,
   getStatus,
 } from '../../../utils/statusColors';
-import { useSetSubscriptionStatus } from '../../../hooks/useSubscription';
+import {
+  useSetSubscriptionStatus,
+  useUpdateBillingInfo,
+  useMarkInvoiceSent,
+  useMarkPaymentReceived,
+} from '../../../hooks/useSubscription';
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '—';
@@ -53,6 +59,14 @@ export default function RestaurantCrmDetail() {
   const addNote = useAddRestaurantNote(restaurantId);
   const deleteNote = useDeleteRestaurantNote(restaurantId);
   const setSubscription = useSetSubscriptionStatus();
+  const updateBilling = useUpdateBillingInfo();
+  const markInvoiceSent = useMarkInvoiceSent();
+  const markPaymentReceived = useMarkPaymentReceived();
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [billingAmount, setBillingAmount] = useState('');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'quarterly' | 'annual'>('monthly');
+  const [billingPlan, setBillingPlan] = useState('');
+  const [billingNotes, setBillingNotes] = useState('');
 
   function handleSubscriptionChange() {
     const r = data?.restaurant;
@@ -67,6 +81,60 @@ export default function RestaurantCrmDetail() {
         { text: 'Set Inactive', style: 'destructive', onPress: () => setSubscription.mutateAsync({ restaurantId, status: 'inactive' }) },
         { text: 'Cancel', style: 'cancel' },
       ]
+    );
+  }
+
+  function openBillingModal() {
+    const r = data?.restaurant as any;
+    if (!r) return;
+    setBillingAmount(r.invoice_amount_pence != null ? String((r.invoice_amount_pence / 100).toFixed(0)) : '');
+    setBillingInterval((r.invoice_interval as 'monthly' | 'quarterly' | 'annual') ?? 'monthly');
+    setBillingPlan(r.subscription_plan ?? '');
+    setBillingNotes(r.billing_notes ?? '');
+    setBillingModalOpen(true);
+  }
+
+  async function saveBilling() {
+    const parsed = Number(billingAmount);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      Alert.alert('Please enter a valid amount in £.');
+      return;
+    }
+    try {
+      await updateBilling.mutateAsync({
+        restaurantId,
+        amountPence: Math.round(parsed * 100),
+        interval: billingInterval,
+        plan: billingPlan.trim() || undefined,
+        notes: billingNotes,
+      });
+      setBillingModalOpen(false);
+    } catch {
+      Alert.alert('Could not save billing details.');
+    }
+  }
+
+  function handleMarkSent() {
+    Alert.alert('Mark invoice as sent?', 'Stamps today as the last invoice sent date.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark sent', onPress: () => markInvoiceSent.mutateAsync(restaurantId) },
+    ]);
+  }
+
+  function handleMarkPaid() {
+    Alert.alert(
+      'Mark payment received?',
+      'Activates the subscription, stamps today as last payment, and bumps the renewal date forward by the current billing interval.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark paid',
+          onPress: () => markPaymentReceived.mutateAsync({
+            restaurantId,
+            interval: ((data?.restaurant as any)?.invoice_interval as any) ?? 'monthly',
+          }),
+        },
+      ],
     );
   }
 
@@ -176,6 +244,63 @@ export default function RestaurantCrmDetail() {
           </TouchableOpacity>
         </View>
 
+        {/* Billing */}
+        <Text style={styles.sectionTitle}>Billing</Text>
+        <View style={styles.billingCard}>
+          <View style={styles.billingHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.billingTitle}>
+                {r.invoice_amount_pence != null
+                  ? `£${(r.invoice_amount_pence / 100).toFixed(0)} · ${r.invoice_interval ?? 'monthly'}`
+                  : 'No billing set'}
+              </Text>
+              <Text style={styles.billingSub}>
+                Plan: {(r.subscription_plan as string | null) ?? '—'}
+                {r.subscription_renews_at ? ` · Renews ${formatDate(r.subscription_renews_at)}` : ''}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={openBillingModal} style={styles.billingEdit}>
+              <Text style={styles.billingEditText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.billingGrid}>
+            <View style={styles.billingRow}>
+              <Text style={styles.billingKey}>Last invoice</Text>
+              <Text style={styles.billingVal}>{formatDate(r.last_invoice_sent_at)}</Text>
+            </View>
+            <View style={styles.billingRow}>
+              <Text style={styles.billingKey}>Last payment</Text>
+              <Text style={styles.billingVal}>{formatDate(r.last_payment_received_at)}</Text>
+            </View>
+          </View>
+
+          {r.billing_notes ? (
+            <Text style={styles.billingNotes}>{r.billing_notes}</Text>
+          ) : null}
+
+          <View style={styles.billingActions}>
+            <TouchableOpacity
+              style={[styles.billingBtn, styles.billingBtnSecondary]}
+              onPress={handleMarkSent}
+              disabled={markInvoiceSent.isPending}
+            >
+              <Text style={[styles.billingBtnText, styles.billingBtnTextSecondary]}>
+                {markInvoiceSent.isPending ? 'Saving…' : '✉️  Invoice sent'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.billingBtn}
+              onPress={handleMarkPaid}
+              disabled={markPaymentReceived.isPending}
+            >
+              <Text style={styles.billingBtnText}>
+                {markPaymentReceived.isPending ? 'Saving…' : '✅  Payment received'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Notes */}
         <Text style={styles.sectionTitle}>Notes</Text>
         <NotesPanel
@@ -255,6 +380,76 @@ export default function RestaurantCrmDetail() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal visible={billingModalOpen} animationType="slide" transparent>
+        <View style={overlayStyles.overlay}>
+          <ScrollView contentContainerStyle={overlayStyles.sheet}>
+            <Text style={overlayStyles.title}>Edit billing</Text>
+
+            <Text style={overlayStyles.label}>Monthly amount (£)</Text>
+            <TextInput
+              style={overlayStyles.input}
+              keyboardType="number-pad"
+              value={billingAmount}
+              onChangeText={setBillingAmount}
+              placeholder="49"
+              placeholderTextColor={colours.textMuted}
+            />
+
+            <Text style={overlayStyles.label}>Interval</Text>
+            <View style={overlayStyles.chipRow}>
+              {(['monthly', 'quarterly', 'annual'] as const).map(iv => {
+                const active = billingInterval === iv;
+                return (
+                  <TouchableOpacity
+                    key={iv}
+                    style={[overlayStyles.chip, active && overlayStyles.chipActive]}
+                    onPress={() => setBillingInterval(iv)}
+                  >
+                    <Text style={[overlayStyles.chipText, active && overlayStyles.chipTextActive]}>
+                      {iv.charAt(0).toUpperCase() + iv.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={overlayStyles.label}>Plan label</Text>
+            <TextInput
+              style={overlayStyles.input}
+              value={billingPlan}
+              onChangeText={setBillingPlan}
+              placeholder="e.g. standard, premium, custom"
+              placeholderTextColor={colours.textMuted}
+              autoCapitalize="none"
+            />
+
+            <Text style={overlayStyles.label}>Billing notes</Text>
+            <TextInput
+              style={[overlayStyles.input, overlayStyles.textarea]}
+              value={billingNotes}
+              onChangeText={setBillingNotes}
+              placeholder="e.g. Invoice via Xero, 30 day terms"
+              placeholderTextColor={colours.textMuted}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TouchableOpacity
+              style={overlayStyles.saveBtn}
+              onPress={saveBilling}
+              disabled={updateBilling.isPending}
+            >
+              {updateBilling.isPending
+                ? <ActivityIndicator color={colours.charcoalDark} />
+                : <Text style={overlayStyles.saveBtnText}>Save</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setBillingModalOpen(false)} style={overlayStyles.cancelBtn}>
+              <Text style={overlayStyles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -305,4 +500,40 @@ const styles = StyleSheet.create({
   dinerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, gap: 10 },
 
   emptyText: { fontSize: 13, color: colours.textMuted, textAlign: 'center', paddingVertical: 16, fontStyle: 'italic' },
+
+  // Billing card
+  billingCard: { backgroundColor: colours.white, borderRadius: 14, padding: 16, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  billingHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  billingTitle: { fontSize: 16, fontWeight: '700', color: colours.textPrimary },
+  billingSub: { fontSize: 12, color: colours.textMuted, marginTop: 2 },
+  billingEdit: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colours.border, backgroundColor: colours.offWhite },
+  billingEditText: { fontSize: 12, fontWeight: '700', color: colours.textPrimary },
+  billingGrid: { gap: 6, borderTopWidth: 1, borderTopColor: colours.border, paddingTop: 10 },
+  billingRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  billingKey: { fontSize: 12, color: colours.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  billingVal: { fontSize: 13, color: colours.textPrimary, fontWeight: '600' },
+  billingNotes: { fontSize: 13, color: colours.textSecondary, lineHeight: 18, backgroundColor: colours.offWhite, padding: 10, borderRadius: 8, fontStyle: 'italic' },
+  billingActions: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  billingBtn: { flex: 1, backgroundColor: colours.gold, borderRadius: 10, padding: 11, alignItems: 'center' },
+  billingBtnSecondary: { backgroundColor: colours.white, borderWidth: 1, borderColor: colours.border },
+  billingBtnText: { fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
+  billingBtnTextSecondary: { color: colours.textPrimary },
+});
+
+const overlayStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colours.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 },
+  title: { fontSize: 20, fontWeight: '700', color: colours.textPrimary, marginBottom: 20 },
+  label: { fontSize: 13, fontWeight: '600', color: colours.textSecondary, marginBottom: 6 },
+  input: { backgroundColor: colours.offWhite, borderWidth: 1, borderColor: colours.border, borderRadius: 10, padding: 13, fontSize: 15, color: colours.textPrimary, marginBottom: 16 },
+  textarea: { minHeight: 70, textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colours.border, backgroundColor: colours.offWhite },
+  chipActive: { borderColor: colours.gold, backgroundColor: colours.gold },
+  chipText: { fontSize: 12, fontWeight: '600', color: colours.textSecondary },
+  chipTextActive: { color: colours.charcoalDark },
+  saveBtn: { backgroundColor: colours.gold, borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 8 },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: colours.charcoalDark },
+  cancelBtn: { alignItems: 'center', padding: 14 },
+  cancelText: { fontSize: 14, color: colours.textMuted },
 });

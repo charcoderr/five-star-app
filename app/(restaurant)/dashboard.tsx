@@ -154,24 +154,22 @@ export default function RestaurantDashboard() {
           <Text style={styles.quickActionIcon}>✏️</Text>
           <Text style={styles.quickActionLabel}>Edit Checklist</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(restaurant)/subscription')}>
+        <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(restaurant)/account')}>
           <Text style={styles.quickActionIcon}>💳</Text>
-          <Text style={styles.quickActionLabel}>
-            {sub?.subscription_status === 'active' ? 'Subscription' : 'Subscribe'}
-          </Text>
+          <Text style={styles.quickActionLabel}>Account</Text>
         </TouchableOpacity>
       </View>
 
       {sub?.subscription_status !== 'active' && (
         <TouchableOpacity
           style={styles.subscriptionBanner}
-          onPress={() => router.push('/(restaurant)/subscription')}
+          onPress={() => router.push('/(restaurant)/account')}
         >
           <Text style={styles.subscriptionBannerTitle}>
             {sub?.subscription_status === 'trial' ? 'You\'re on a free trial' : 'No active subscription'}
           </Text>
           <Text style={styles.subscriptionBannerBody}>
-            Subscribe to unlock full reports and analytics. →
+            Contact Wendy at 5StarX to activate full reports. →
           </Text>
         </TouchableOpacity>
       )}

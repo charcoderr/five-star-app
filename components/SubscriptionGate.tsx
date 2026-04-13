@@ -5,17 +5,18 @@ import { colours } from '../utils/theme';
 interface Props {
   status: 'active' | 'inactive' | 'trial' | string | undefined;
   children: React.ReactNode;
-  /** How many items to show in trial mode before cutting off (default 2) */
-  trialPreviewCount?: number;
 }
 
 /**
- * Wraps content that requires an active subscription.
+ * Gates content that requires an active subscription.
  * - active: renders children as-is
- * - trial: renders children but with a soft paywall banner at the bottom
+ * - trial: renders children with a soft banner at the bottom
  * - inactive: renders a hard paywall replacing the content
+ *
+ * Payments are processed manually by Wendy — the CTA routes to the
+ * account screen where billing contact details live.
  */
-export default function SubscriptionGate({ status, children, trialPreviewCount = 2 }: Props) {
+export default function SubscriptionGate({ status, children }: Props) {
   if (status === 'active') return <>{children}</>;
 
   if (status === 'inactive') {
@@ -24,13 +25,14 @@ export default function SubscriptionGate({ status, children, trialPreviewCount =
         <Text style={styles.icon}>🔒</Text>
         <Text style={styles.title}>Subscription required</Text>
         <Text style={styles.body}>
-          Subscribe to 5StarX to access your mystery dine reports, scores, and analytics.
+          Your 5StarX subscription is not currently active. Contact Wendy at 5StarX
+          to resume access to your mystery dine reports.
         </Text>
         <TouchableOpacity
           style={styles.ctaBtn}
-          onPress={() => router.push('/(restaurant)/subscription')}
+          onPress={() => router.push('/(restaurant)/account')}
         >
-          <Text style={styles.ctaBtnText}>View plans</Text>
+          <Text style={styles.ctaBtnText}>Account details</Text>
         </TouchableOpacity>
       </View>
     );
@@ -44,13 +46,13 @@ export default function SubscriptionGate({ status, children, trialPreviewCount =
         <View style={styles.trialBannerInner}>
           <Text style={styles.trialTitle}>You're on a free trial</Text>
           <Text style={styles.trialBody}>
-            Subscribe to unlock all reports and the full analytics dashboard.
+            Speak to Wendy at 5StarX to activate your full subscription.
           </Text>
           <TouchableOpacity
             style={styles.trialBtn}
-            onPress={() => router.push('/(restaurant)/subscription')}
+            onPress={() => router.push('/(restaurant)/account')}
           >
-            <Text style={styles.trialBtnText}>See plans →</Text>
+            <Text style={styles.trialBtnText}>Account →</Text>
           </TouchableOpacity>
         </View>
       </View>

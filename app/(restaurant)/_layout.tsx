@@ -16,8 +16,8 @@ export default function RestaurantLayout() {
       <Tabs.Screen name="reports"      options={{ title: 'Reports',   tabBarIcon: ({ color }) => <TabIcon icon="📋" color={color} /> }} />
       <Tabs.Screen name="proforma"     options={{ title: 'Checklist', tabBarIcon: ({ color }) => <TabIcon icon="✏️" color={color} /> }} />
       {/* Hidden — navigated to programmatically */}
-      <Tabs.Screen name="report"       options={{ href: null }} />
-      <Tabs.Screen name="subscription" options={{ href: null }} />
+      <Tabs.Screen name="report"  options={{ href: null }} />
+      <Tabs.Screen name="account" options={{ href: null }} />
     </Tabs>
   );
 }
