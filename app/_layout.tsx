@@ -52,14 +52,17 @@ function AuthGuard() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const firstSegment = segments[0] as string | undefined;
+    const inAuthGroup = firstSegment === '(auth)';
+    const atRoot = !firstSegment;
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
       return;
     }
 
-    if (session && user && inAuthGroup) {
+    // Logged in but still on the auth stack or the root index — route by role
+    if (session && user && (inAuthGroup || atRoot)) {
       routeByRole(user);
     }
   }, [session, user, isLoading, segments]);
