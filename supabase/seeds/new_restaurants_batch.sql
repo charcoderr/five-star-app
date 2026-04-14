@@ -200,7 +200,7 @@ from restaurant_proformas cross join questions_array;
 -- ─── 3. Open slots (staggered dates, 19:30 each) ─────────────────────────────
 
 insert into public.slots (id, restaurant_id, date, time, max_covers, status, created_by)
-select id, restaurant_id, date, time, max_covers, 'open',
+select id, restaurant_id, date, time::time, max_covers, 'open',
        (select id from public.users where role = 'admin' limit 1)
 from (values
   ('bbbbbbbb-4444-4000-8000-000000000001'::uuid, 'aaaaaaaa-4444-4000-8000-000000000001'::uuid, (current_date + interval  '7 days')::date, '19:30', 2),

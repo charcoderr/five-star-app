@@ -17,7 +17,7 @@
 -- ─── Slot IDs  dddddddd-RRRR-...
 -- ─── Assignment IDs  eeeeeeee-RRRR-...
 -- ─── Report IDs  ffffffff-RRRR-...
--- ─── Rating IDs  gggggggg-RRRR-...
+-- ─── Rating IDs  fafafafa-RRRR-...
 
 -- ─── 1. Historical slots (all in the past, status = completed) ───────────────
 
@@ -285,7 +285,7 @@ with answer_map(ord, ans) as (values
   (50, '{"value":true}'),
   (51, '{"value":true}'),
   (52, '{"value":true,"notes":"Yes, good value for price and style of venue"}'),
-  (53, '{"text":"Main waiter Robert — mid 30s, dark hair. Very good at his job. Explained the process clearly, couldn't have been more helpful. Able to recommend nearby bars. Impeccable service."}'),
+  (53, '{"text":"Main waiter Robert — mid 30s, dark hair. Very good at his job. Explained the process clearly, couldn''t have been more helpful. Able to recommend nearby bars. Impeccable service."}'),
   (54, '{"text":"Chicken quesadilla (best course), beef tacitos (average), fish tacos (not to our taste), fries (good), calamari (good). Water and lager. Food nice enough for venue style."}'),
   (55, '{"text":"Speed of service was fantastic — no struggle to get attention. Pint of beer not as cold as expected. One thing to improve: beer temperature. Fish tacos a weak spot on the menu."}')
 ),
@@ -422,7 +422,7 @@ with answer_map(ord, ans) as (values
   (36, '{"score":3}'),
   (37, '{"score":2,"notes":"Dessert menu available when requested but not proactively offered"}'),
   (38, '{"score":3,"notes":"Food delicious — plates were nice and hot"}'),
-  (39, '{"score":2,"notes":"Cod could have been bigger — delicious but didn't feel full"}'),
+  (39, '{"score":2,"notes":"Cod could have been bigger — delicious but didn''t feel full"}'),
   (40, '{"score":3}'),
   (41, '{"score":3}'),
   (42, '{"score":3}'),
@@ -545,7 +545,7 @@ with answer_map(ord, ans) as (values
   (8,  '{"score":3}'),
   (9,  '{"score":3,"notes":"No offensive smells, lots of parked cars but quiet street"}'),
   (10, '{"score":0,"notes":"Not met at door — 2 people saw us enter and ignored us before eventually coming over"}'),
-  (11, '{"score":0,"notes":"Host claimed booking didn't exist; turned out it was booked under first name only"}'),
+  (11, '{"score":0,"notes":"Host claimed booking didn''t exist; turned out it was booked under first name only"}'),
   (12, '{"score":3,"notes":"Received a nice table by the window"}'),
   (13, '{"score":3,"notes":"Nice traditional Italian feel"}'),
   (14, '{"score":3,"notes":"Not too loud, appropriate to the restaurant"}'),
@@ -754,15 +754,15 @@ select
 
 delete from public.ratings
 where id in (
-  'gggggggg-2222-4000-8000-000000000001',
-  'gggggggg-3333-4000-8000-000000000001',
-  'gggggggg-4444-4000-8000-000000000001',
-  'gggggggg-5555-4000-8000-000000000001',
-  'gggggggg-6666-4000-8000-000000000001',
-  'gggggggg-7777-4000-8000-000000000001',
-  'gggggggg-8888-4000-8000-000000000001',
-  'gggggggg-9999-4000-8000-000000000001',
-  'gggggggg-aaaa-4000-8000-000000000001'
+  'fafafafa-2222-4000-8000-000000000001',
+  'fafafafa-3333-4000-8000-000000000001',
+  'fafafafa-4444-4000-8000-000000000001',
+  'fafafafa-5555-4000-8000-000000000001',
+  'fafafafa-6666-4000-8000-000000000001',
+  'fafafafa-7777-4000-8000-000000000001',
+  'fafafafa-8888-4000-8000-000000000001',
+  'fafafafa-9999-4000-8000-000000000001',
+  'fafafafa-aaaa-4000-8000-000000000001'
 );
 
 with report_scores as (
@@ -790,15 +790,15 @@ with report_scores as (
 ),
 rating_ids(report_id, rating_id) as (
   values
-    ('ffffffff-2222-4000-8000-000000000001'::uuid, 'gggggggg-2222-4000-8000-000000000001'::uuid),
-    ('ffffffff-3333-4000-8000-000000000001'::uuid, 'gggggggg-3333-4000-8000-000000000001'::uuid),
-    ('ffffffff-4444-4000-8000-000000000001'::uuid, 'gggggggg-4444-4000-8000-000000000001'::uuid),
-    ('ffffffff-5555-4000-8000-000000000001'::uuid, 'gggggggg-5555-4000-8000-000000000001'::uuid),
-    ('ffffffff-6666-4000-8000-000000000001'::uuid, 'gggggggg-6666-4000-8000-000000000001'::uuid),
-    ('ffffffff-7777-4000-8000-000000000001'::uuid, 'gggggggg-7777-4000-8000-000000000001'::uuid),
-    ('ffffffff-8888-4000-8000-000000000001'::uuid, 'gggggggg-8888-4000-8000-000000000001'::uuid),
-    ('ffffffff-9999-4000-8000-000000000001'::uuid, 'gggggggg-9999-4000-8000-000000000001'::uuid),
-    ('ffffffff-aaaa-4000-8000-000000000001'::uuid, 'gggggggg-aaaa-4000-8000-000000000001'::uuid)
+    ('ffffffff-2222-4000-8000-000000000001'::uuid, 'fafafafa-2222-4000-8000-000000000001'::uuid),
+    ('ffffffff-3333-4000-8000-000000000001'::uuid, 'fafafafa-3333-4000-8000-000000000001'::uuid),
+    ('ffffffff-4444-4000-8000-000000000001'::uuid, 'fafafafa-4444-4000-8000-000000000001'::uuid),
+    ('ffffffff-5555-4000-8000-000000000001'::uuid, 'fafafafa-5555-4000-8000-000000000001'::uuid),
+    ('ffffffff-6666-4000-8000-000000000001'::uuid, 'fafafafa-6666-4000-8000-000000000001'::uuid),
+    ('ffffffff-7777-4000-8000-000000000001'::uuid, 'fafafafa-7777-4000-8000-000000000001'::uuid),
+    ('ffffffff-8888-4000-8000-000000000001'::uuid, 'fafafafa-8888-4000-8000-000000000001'::uuid),
+    ('ffffffff-9999-4000-8000-000000000001'::uuid, 'fafafafa-9999-4000-8000-000000000001'::uuid),
+    ('ffffffff-aaaa-4000-8000-000000000001'::uuid, 'fafafafa-aaaa-4000-8000-000000000001'::uuid)
 )
 insert into public.ratings (id, restaurant_id, report_id, score, calculated_at)
 select
@@ -840,7 +840,7 @@ select
   (select count(*) from jsonb_each(rep.answers))      as answers_filled,
   round(rat.score, 2)                                 as star_rating
 from public.restaurants r
-join public.slots     s   on s.restaurant_id = r.id and s.id like 'dddddddd%'
+join public.slots     s   on s.restaurant_id = r.id and s.id::text like 'dddddddd%'
 join public.assignments a on a.slot_id = s.id
 join public.reports   rep on rep.assignment_id = a.id
 join public.proformas p   on p.restaurant_id = r.id
