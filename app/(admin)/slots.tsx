@@ -460,7 +460,7 @@ export default function AdminSlots() {
           { key: '', label: 'All' },
           { key: 'claimed', label: 'To Approve', count: pendingCount },
           { key: 'open', label: 'Posted' },
-          { key: 'completed', label: 'Done' },
+          { key: 'completed', label: 'Reviewed' },
         ] as { key: typeof filterStatus; label: string; count?: number }[]).map(f => (
           <TouchableOpacity
             key={f.key}
@@ -526,7 +526,7 @@ export default function AdminSlots() {
                 <View style={styles.cardRight}>
                   <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
                     <Text style={[styles.statusText, { color: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
-                      {isPending ? '1 APPLICANT' : item.status === 'open' ? 'POSTED' : item.status === 'completed' ? 'DONE' : item.status.toUpperCase()}
+                      {isPending ? '1 APPLICANT' : item.status === 'open' ? 'POSTED' : item.status === 'completed' ? 'REVIEWED' :item.status.toUpperCase()}
                     </Text>
                   </View>
                   {waitingCount > 0 && (
