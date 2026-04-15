@@ -97,12 +97,12 @@ export default function AdminDashboard() {
       {(stats?.pendingSlotClaims ?? 0) > 0 && (
         <TouchableOpacity
           style={[styles.banner, styles.bannerGold]}
-          onPress={() => router.push('/(admin)/slots')}
+          onPress={() => router.push({ pathname: '/(admin)/slots', params: { filter: 'pending' } })}
           activeOpacity={0.85}
         >
           <Ionicons name="ticket-outline" size={18} color={colours.goldDark} style={{ marginRight: 8 }} />
           <Text style={styles.bannerText}>
-            {stats?.pendingSlotClaims} diner voucher request{stats?.pendingSlotClaims !== 1 ? 's' : ''} to approve
+            {stats?.pendingSlotClaims} diner voucher request{stats?.pendingSlotClaims !== 1 ? 's' : ''} to approve — tap to review
           </Text>
           <Ionicons name="chevron-forward" size={18} color={colours.gold} />
         </TouchableOpacity>

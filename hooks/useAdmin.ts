@@ -42,6 +42,7 @@ export function useAllReports() {
           diner:users!reports_diner_id_fkey(name, email),
           restaurant:restaurants(name)
         `)
+        .neq('status', 'draft')
         .order('submitted_at', { ascending: false });
       if (error) throw error;
       return data;

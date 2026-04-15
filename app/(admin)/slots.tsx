@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Alert, RefreshControl, Modal,
   TextInput, ScrollView,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useAllSlots, useCreateSlot, useSlotAssignments, useUpdateSlot, useCancelSlot } from '../../hooks/useSlots';
 import { useIssueVoucher } from '../../hooks/useVouchers';
@@ -103,7 +104,8 @@ function AssignmentsModal({
 
   return (
     <View style={modalStyles.container}>
-      <Text style={modalStyles.title}>Slot Claims</Text>
+      <Text style={modalStyles.title}>Voucher Application</Text>
+      <Text style={modalStyles.subtitle}>{slot?.restaurant?.name ?? ''}</Text>
       {isLoading ? (
         <ActivityIndicator color={colours.gold} />
       ) : assignments?.length === 0 ? (
@@ -216,21 +218,30 @@ export default function AdminSlots() {
   const cancelSlot = useCancelSlot();
   const notifySlot = useNotifyDinersForSlot();
   const notifySlots = useNotifyDinersForSlots();
+  const { filter } = useLocalSearchParams<{ filter?: string }>();
 
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'' | 'claimed' | 'open' | 'completed' | 'cancelled'>('');
+
+  useEffect(() => {
+    if (filter === 'pending') setFilterStatus('claimed');
+  }, [filter]);
+
+  const pendingCount = useMemo(() => (slots ?? []).filter(s => s.status === 'claimed').length, [slots]);
 
   const sortedSlots = useMemo(() => {
     const statusOrder: Record<string, number> = { open: 0, claimed: 1, completed: 2, cancelled: 3 };
     // For sort: voucher_expiry takes priority over legacy date.
     const sortKey = (s: any) => s.voucher_expiry ?? s.date ?? '9999-12-31';
     return [...(slots ?? [])]
-      .filter(s => !search || s.restaurant?.name?.toLowerCase().includes(search.toLowerCase()))
+      .filter(s => (!search || s.restaurant?.name?.toLowerCase().includes(search.toLowerCase()))
+        && (!filterStatus || s.status === filterStatus))
       .sort((a, b) => {
         const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
         if (statusDiff !== 0) return statusDiff;
         return new Date(sortKey(a)).getTime() - new Date(sortKey(b)).getTime();
       });
-  }, [slots, search]);
+  }, [slots, search, filterStatus]);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any | null>(null);
@@ -443,6 +454,33 @@ export default function AdminSlots() {
         />
       </View>
 
+      {/* Filter chips */}
+      <View style={styles.filterRow}>
+        {([
+          { key: '', label: 'All' },
+          { key: 'claimed', label: 'Applications', count: pendingCount },
+          { key: 'open', label: 'Open' },
+          { key: 'completed', label: 'Completed' },
+        ] as { key: typeof filterStatus; label: string; count?: number }[]).map(f => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterChip, filterStatus === f.key && styles.filterChipActive]}
+            onPress={() => setFilterStatus(f.key)}
+          >
+            <Text style={[styles.filterChipText, filterStatus === f.key && styles.filterChipTextActive]}>
+              {f.label}
+            </Text>
+            {(f.count ?? 0) > 0 && (
+              <View style={[styles.filterBadge, filterStatus === f.key && styles.filterBadgeActive]}>
+                <Text style={[styles.filterBadgeText, filterStatus === f.key && styles.filterBadgeTextActive]}>
+                  {f.count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <FlatList
         data={sortedSlots}
         keyExtractor={item => item.id}
@@ -459,11 +497,12 @@ export default function AdminSlots() {
           const waitingCount = waitlistCounts?.[item.id] ?? 0;
           const canEdit = item.status === 'open';
           const canCancel = item.status === 'open' || item.status === 'claimed';
+          const isPending = item.status === 'claimed';
           return (
             <TouchableOpacity
-              style={styles.card}
-              onPress={() => item.status === 'claimed' ? setSelectedSlot(item) : null}
-              activeOpacity={item.status === 'claimed' ? 0.7 : 1}
+              style={[styles.card, isPending && styles.cardPending]}
+              onPress={() => isPending ? setSelectedSlot(item) : null}
+              activeOpacity={isPending ? 0.7 : 1}
             >
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
@@ -487,7 +526,7 @@ export default function AdminSlots() {
                 <View style={styles.cardRight}>
                   <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
                     <Text style={[styles.statusText, { color: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
-                      {item.status.toUpperCase()}
+                      {isPending ? 'APPLIED' : item.status.toUpperCase()}
                     </Text>
                   </View>
                   {waitingCount > 0 && (
@@ -497,18 +536,24 @@ export default function AdminSlots() {
                   )}
                 </View>
               </View>
-              {item.status === 'claimed' && (
-                <Text style={styles.tapHint}>Tap to review claim →</Text>
+              {isPending && (
+                <TouchableOpacity
+                  style={styles.reviewBtn}
+                  onPress={() => setSelectedSlot(item)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.reviewBtnText}>Review Application & Issue Voucher →</Text>
+                </TouchableOpacity>
               )}
               {(canEdit || canCancel) && (
                 <View style={styles.cardActions}>
                   {canEdit && (
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={(e) => { e.stopPropagation?.(); openEdit(item); }}>
                       <Text style={styles.actionBtnText}>Edit</Text>
                     </TouchableOpacity>
                   )}
                   {canCancel && (
-                    <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleCancelSlot(item)}>
+                    <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={(e) => { e.stopPropagation?.(); handleCancelSlot(item); }}>
                       <Text style={[styles.actionBtnText, styles.actionBtnTextDanger]}>Cancel Slot</Text>
                     </TouchableOpacity>
                   )}
@@ -672,7 +717,18 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: '700' },
   waitlistBadge: { backgroundColor: colours.scoreFair + '22', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colours.scoreFair },
   waitlistBadgeText: { fontSize: 10, fontWeight: '700', color: colours.scoreFair },
-  tapHint: { fontSize: 12, color: colours.gold, marginTop: 10, fontWeight: '600' },
+  cardPending: { borderLeftWidth: 3, borderLeftColor: colours.scoreFair, backgroundColor: colours.scoreFair + '08' },
+  reviewBtn: { marginTop: 12, backgroundColor: colours.gold, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  reviewBtnText: { fontSize: 14, fontWeight: '700', color: colours.charcoalDark },
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colours.border, backgroundColor: colours.offWhite },
+  filterChipActive: { borderColor: colours.gold, backgroundColor: colours.gold },
+  filterChipText: { fontSize: 12, fontWeight: '700', color: colours.textSecondary },
+  filterChipTextActive: { color: colours.charcoalDark },
+  filterBadge: { backgroundColor: colours.scoreFair, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  filterBadgeActive: { backgroundColor: colours.charcoalDark },
+  filterBadgeText: { fontSize: 10, fontWeight: '700', color: colours.white },
+  filterBadgeTextActive: { color: colours.white },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colours.border },
   actionBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1.5, borderColor: colours.gold, backgroundColor: colours.offWhite },
   actionBtnDanger: { borderColor: colours.error, backgroundColor: colours.offWhite },
@@ -708,7 +764,8 @@ const overlayStyles = StyleSheet.create({
 
 const modalStyles = StyleSheet.create({
   container: { padding: 4 },
-  title: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, marginBottom: 16 },
+  title: { fontSize: 18, fontWeight: '700', color: colours.textPrimary, marginBottom: 2 },
+  subtitle: { fontSize: 13, color: colours.textSecondary, marginBottom: 16 },
   empty: { fontSize: 14, color: colours.textMuted, textAlign: 'center', paddingVertical: 20 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colours.border },
   dinerName: { fontSize: 15, fontWeight: '700', color: colours.textPrimary },
