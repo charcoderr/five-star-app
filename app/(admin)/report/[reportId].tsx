@@ -12,14 +12,16 @@ function ScoreBadge({ score }: { score: number }) {
   const bg = colours_map[score] ?? colours.textMuted;
   return (
     <View style={[badgeStyles.badge, { backgroundColor: bg + '22', borderColor: bg }]}>
-      <Text style={[badgeStyles.text, { color: bg }]}>{SCORE_LABELS[score]}</Text>
+      <Text style={[badgeStyles.num, { color: bg }]}>{score}</Text>
+      <Text style={[badgeStyles.label, { color: bg }]}>{SCORE_LABELS[score]}</Text>
     </View>
   );
 }
 
 const badgeStyles = StyleSheet.create({
-  badge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, alignSelf: 'flex-start' },
-  text: { fontSize: 11, fontWeight: '700' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, alignSelf: 'flex-start' },
+  num: { fontSize: 14, fontWeight: '800' },
+  label: { fontSize: 12, fontWeight: '700' },
 });
 
 export default function AdminReportDetail() {
@@ -205,27 +207,37 @@ export default function AdminReportDetail() {
                     <Text style={styles.catScore}>{catTotal}/{catMax}</Text>
                   )}
                 </View>
-                {items.map(({ question, answer }) => (
-                  <View key={question.id} style={styles.qRow}>
-                    <Text style={styles.qLabel}>{question.order}. {question.label}</Text>
-                    <View style={styles.qAnswer}>
-                      {answer.score !== undefined && <ScoreBadge score={answer.score} />}
-                      {answer.value !== undefined && (
-                        <View style={[styles.yesNoBadge, { backgroundColor: answer.value ? colours.scoreGood + '22' : colours.scorePoor + '22', borderColor: answer.value ? colours.scoreGood : colours.scorePoor }]}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: answer.value ? colours.scoreGood : colours.scorePoor }}>
-                            {answer.value ? 'Yes' : 'No'}
-                          </Text>
-                        </View>
-                      )}
-                      {answer.text ? (
-                        <Text style={styles.qText}>"{answer.text}"</Text>
-                      ) : null}
-                      {answer.notes ? (
-                        <Text style={styles.qNotes}>Note: {answer.notes}</Text>
-                      ) : null}
+                {items.map(({ question, answer }) => {
+                  const hasAny =
+                    answer?.score !== undefined ||
+                    answer?.value !== undefined ||
+                    answer?.text ||
+                    answer?.notes;
+                  return (
+                    <View key={question.id} style={styles.qRow}>
+                      <Text style={styles.qLabel}>{question.order}. {question.label}</Text>
+                      <View style={styles.qAnswer}>
+                        {answer?.score !== undefined && <ScoreBadge score={answer.score} />}
+                        {answer?.value !== undefined && (
+                          <View style={[styles.yesNoBadge, { backgroundColor: answer.value ? colours.scoreGood + '22' : colours.scorePoor + '22', borderColor: answer.value ? colours.scoreGood : colours.scorePoor }]}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: answer.value ? colours.scoreGood : colours.scorePoor }}>
+                              {answer.value ? 'Yes' : 'No'}
+                            </Text>
+                          </View>
+                        )}
+                        {answer?.text ? (
+                          <Text style={styles.qText}>"{answer.text}"</Text>
+                        ) : null}
+                        {answer?.notes ? (
+                          <Text style={styles.qNotes}>Note: {answer.notes}</Text>
+                        ) : null}
+                        {!hasAny && (
+                          <Text style={styles.qEmpty}>— not answered —</Text>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             );
           })
@@ -333,12 +345,13 @@ const styles = StyleSheet.create({
   detailValue: { color: colours.textPrimary, fontWeight: '600' },
   catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   catScore: { fontSize: 13, fontWeight: '700', color: colours.gold },
-  qRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colours.border + '88', gap: 6 },
+  qRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colours.border + '88', gap: 8 },
   qLabel: { fontSize: 13, color: colours.textPrimary, lineHeight: 18, fontWeight: '500' },
-  qAnswer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 },
+  qAnswer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 4, paddingLeft: 4, borderLeftWidth: 2, borderLeftColor: colours.gold + '66' },
   qNotes: { fontSize: 12, color: colours.textSecondary, fontStyle: 'italic', width: '100%' },
   qText: { fontSize: 13, color: colours.textPrimary, fontStyle: 'italic', lineHeight: 19, flex: 1 },
-  yesNoBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, alignSelf: 'flex-start' },
+  qEmpty: { fontSize: 12, color: colours.textMuted, fontStyle: 'italic' },
+  yesNoBadge: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, alignSelf: 'flex-start' },
   textAnswer: { backgroundColor: colours.offWhite, borderRadius: 8, padding: 12, marginBottom: 8 },
   textAnswerContent: { fontSize: 14, color: colours.textPrimary, lineHeight: 20, fontStyle: 'italic' },
   photoRow: { flexDirection: 'row', gap: 10 },
