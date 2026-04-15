@@ -39,18 +39,21 @@ export default function DinerHome() {
 
   function handleClaim(slotId: string, restaurantName: string) {
     Alert.alert(
-      'Claim this dine?',
-      `You're requesting ${restaurantName}. Wendy will confirm your assignment shortly.`,
+      `Apply for ${restaurantName}?`,
+      `Once Wendy approves your request, you'll book directly with the restaurant at a time that suits you.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Yes, claim it',
+          text: 'Apply',
           onPress: async () => {
             try {
               await claimSlot.mutateAsync({ slotId, dinerId: user!.id });
-              Alert.alert('Request sent!', 'Wendy will review and confirm your assignment.');
+              Alert.alert(
+                'Application sent!',
+                'Thanks for applying. We\'ll be in touch once this has been accepted — come back to the app then to log your booking.'
+              );
             } catch {
-              Alert.alert('Error', 'Could not claim this slot. It may have just been taken.');
+              Alert.alert('Error', 'Could not apply for this slot. It may have just been taken.');
             }
           },
         },
@@ -101,7 +104,7 @@ export default function DinerHome() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Available Dines</Text>
-          <Text style={styles.headerSub}>Tap a slot to claim your spot</Text>
+          <Text style={styles.headerSub}>Apply for a voucher — you choose when to dine</Text>
         </View>
         <SkeletonList count={4} />
       </View>
@@ -115,7 +118,7 @@ export default function DinerHome() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Available Dines</Text>
-        <Text style={styles.headerSub}>Tap a slot to claim your spot</Text>
+        <Text style={styles.headerSub}>Apply for a voucher — you choose when to dine</Text>
       </View>
 
       <SectionList
@@ -158,28 +161,21 @@ export default function DinerHome() {
                   <Text style={styles.cuisineType}>{item.restaurant?.cuisine_type}</Text>
                   <Text style={styles.address} numberOfLines={1}>{item.restaurant?.address}</Text>
                 </View>
-                {(() => {
-                  const headerDate = item.voucher_expiry ?? item.date;
-                  if (!headerDate) return null;
-                  return (
-                    <View style={styles.dateBox}>
-                      <Text style={styles.dateDay}>{new Date(headerDate).toLocaleDateString('en-GB', { day: 'numeric' })}</Text>
-                      <Text style={styles.dateMonth}>{new Date(headerDate).toLocaleDateString('en-GB', { month: 'short' })}</Text>
-                    </View>
-                  );
-                })()}
+                {item.voucher_expiry ? (
+                  <View style={styles.dateBox}>
+                    <Text style={styles.dateLabel}>USE BY</Text>
+                    <Text style={styles.dateDay}>{new Date(item.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric' })}</Text>
+                    <Text style={styles.dateMonth}>{new Date(item.voucher_expiry).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}</Text>
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.cardMid}>
-                {item.voucher_expiry ? (
-                  <View style={styles.pill}>
-                    <Text style={styles.pillText}>🎟 Expires {new Date(item.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
+                {item.voucher_expiry && (
+                  <View style={[styles.pill, styles.pillExpiry]}>
+                    <Text style={styles.pillExpiryText}>Use by {new Date(item.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
                   </View>
-                ) : item.time ? (
-                  <View style={styles.pill}>
-                    <Text style={styles.pillText}>🕐 {item.time.slice(0, 5)}</Text>
-                  </View>
-                ) : null}
+                )}
                 <View style={styles.pill}>
                   <Text style={styles.pillText}>👥 Up to {item.max_covers} guests</Text>
                 </View>
@@ -242,9 +238,12 @@ const styles = StyleSheet.create({
   restaurantName: { fontSize: 17, fontWeight: '700', color: colours.textPrimary },
   cuisineType: { fontSize: 13, color: colours.gold, fontWeight: '600', marginTop: 2 },
   address: { fontSize: 13, color: colours.textMuted, marginTop: 4 },
-  dateBox: { backgroundColor: colours.charcoalDark, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', minWidth: 52 },
-  dateDay: { fontSize: 22, fontWeight: '700', color: colours.gold },
-  dateMonth: { fontSize: 12, color: colours.white, fontWeight: '600', marginTop: 1 },
+  dateBox: { backgroundColor: colours.charcoalDark, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', minWidth: 60 },
+  dateLabel: { fontSize: 9, fontWeight: '700', color: colours.gold, letterSpacing: 0.8, marginBottom: 2 },
+  dateDay: { fontSize: 22, fontWeight: '700', color: colours.white },
+  dateMonth: { fontSize: 11, color: colours.charcoalLight ?? '#aaa', fontWeight: '600', marginTop: 1 },
+  pillExpiry: { backgroundColor: colours.gold + '18', borderWidth: 1, borderColor: colours.gold + '44' },
+  pillExpiryText: { fontSize: 12, color: colours.goldDark ?? colours.gold, fontWeight: '700' },
   cardMid: { flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
   pill: { backgroundColor: colours.offWhite, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   pillText: { fontSize: 12, color: colours.textSecondary, fontWeight: '600' },
