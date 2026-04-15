@@ -126,7 +126,7 @@ export default function AdminDashboard() {
       {/* Stats grid */}
       <Text style={styles.sectionTitle}>Overview</Text>
       <View style={styles.statsGrid}>
-        <StatCard value={stats?.openSlots ?? 0} label="Open Slots" onPress={() => router.push('/(admin)/slots')} />
+        <StatCard value={stats?.openSlots ?? 0} label="Available Dines" onPress={() => router.push('/(admin)/slots')} />
         <StatCard value={stats?.pendingReports ?? 0} label="Reports to Review" accent={(stats?.pendingReports ?? 0) > 0} onPress={() => router.push('/(admin)/reports')} />
         <StatCard value={stats?.activeDiners ?? 0} label="Active Diners" onPress={() => router.push('/(admin)/diners')} />
         <StatCard value={stats?.restaurants ?? 0} label="Restaurants" onPress={() => router.push('/(admin)/restaurants')} />
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
       {/* Quick actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.quickActions}>
-        <QuickAction width={quickWidth} icon="calendar-outline"      label="New Slot"    onPress={() => router.push('/(admin)/slots')} />
+        <QuickAction width={quickWidth} icon="calendar-outline"      label="New Dine"    onPress={() => router.push('/(admin)/slots')} />
         <QuickAction width={quickWidth} icon="document-text-outline" label="Reports"     onPress={() => router.push('/(admin)/reports')} />
         <QuickAction width={quickWidth} icon="restaurant-outline"    label="Venues"      onPress={() => router.push('/(admin)/restaurants')} />
         <QuickAction width={quickWidth} icon="people-outline"        label="Diners"      onPress={() => router.push('/(admin)/diners')} />

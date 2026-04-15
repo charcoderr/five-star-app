@@ -104,7 +104,7 @@ function AssignmentsModal({
 
   return (
     <View style={modalStyles.container}>
-      <Text style={modalStyles.title}>Voucher Application</Text>
+      <Text style={modalStyles.title}>Diner Application</Text>
       <Text style={modalStyles.subtitle}>{slot?.restaurant?.name ?? ''}</Text>
       {isLoading ? (
         <ActivityIndicator color={colours.gold} />
@@ -394,8 +394,8 @@ export default function AdminSlots() {
       resetBulkForm();
       const restaurant = restaurants?.find(r => r.id === savedId);
       Alert.alert(
-        `${createdSlots.length} slots created!`,
-        `Notify matching diners about the new slots at ${restaurant?.name ?? 'this restaurant'}?`,
+        `${createdSlots.length} dines created!`,
+        `Notify matching diners about the new dines at ${restaurant?.name ?? 'this restaurant'}?`,
         [
           { text: 'Not now', style: 'cancel' },
           {
@@ -411,7 +411,7 @@ export default function AdminSlots() {
                 );
                 Alert.alert('Sent!', `${result.notified} diner${result.notified !== 1 ? 's' : ''} notified.`);
               } catch {
-                Alert.alert('Error', 'Could not send notifications. Slots were still created.');
+                Alert.alert('Error', 'Could not send notifications. Dines were still created.');
               }
             },
           },
@@ -430,7 +430,7 @@ export default function AdminSlots() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Slots</Text>
+          <Text style={styles.headerTitle}>Dines</Text>
           <Text style={styles.headerSub}>{slots?.length ?? 0} total</Text>
         </View>
         <View style={styles.headerBtns}>
@@ -458,9 +458,9 @@ export default function AdminSlots() {
       <View style={styles.filterRow}>
         {([
           { key: '', label: 'All' },
-          { key: 'claimed', label: 'Applications', count: pendingCount },
-          { key: 'open', label: 'Open' },
-          { key: 'completed', label: 'Completed' },
+          { key: 'claimed', label: 'To Approve', count: pendingCount },
+          { key: 'open', label: 'Available' },
+          { key: 'completed', label: 'Done' },
         ] as { key: typeof filterStatus; label: string; count?: number }[]).map(f => (
           <TouchableOpacity
             key={f.key}
@@ -526,7 +526,7 @@ export default function AdminSlots() {
                 <View style={styles.cardRight}>
                   <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
                     <Text style={[styles.statusText, { color: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
-                      {isPending ? 'APPLIED' : item.status.toUpperCase()}
+                      {isPending ? '1 APPLICANT' : item.status === 'open' ? 'AVAILABLE' : item.status === 'completed' ? 'DONE' : item.status.toUpperCase()}
                     </Text>
                   </View>
                   {waitingCount > 0 && (
@@ -542,7 +542,7 @@ export default function AdminSlots() {
                   onPress={() => setSelectedSlot(item)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.reviewBtnText}>Review Application & Issue Voucher →</Text>
+                  <Text style={styles.reviewBtnText}>Approve & Issue Voucher →</Text>
                 </TouchableOpacity>
               )}
               {(canEdit || canCancel) && (
@@ -568,7 +568,7 @@ export default function AdminSlots() {
       <Modal visible={showCreate} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
           <ScrollView contentContainerStyle={overlayStyles.sheet}>
-            <Text style={overlayStyles.title}>New Slot</Text>
+            <Text style={overlayStyles.title}>New Dine</Text>
             <Text style={overlayStyles.label}>Restaurant *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -599,8 +599,8 @@ export default function AdminSlots() {
       <Modal visible={showBulk} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
           <ScrollView contentContainerStyle={overlayStyles.sheet}>
-            <Text style={overlayStyles.title}>Bulk Create Slots</Text>
-            <Text style={overlayStyles.subtitle}>Create recurring slots by selecting day(s) and a date range.</Text>
+            <Text style={overlayStyles.title}>Bulk Create Dines</Text>
+            <Text style={overlayStyles.subtitle}>Create recurring dines by selecting day(s) and a date range.</Text>
             <Text style={overlayStyles.label}>Restaurant *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -638,7 +638,7 @@ export default function AdminSlots() {
               onPress={handleBulkCreate}
               disabled={bulkCreating || bulkPreviewDates.length === 0}
             >
-              {bulkCreating ? <ActivityIndicator color={colours.charcoalDark} /> : <Text style={overlayStyles.createBtnText}>Create {bulkPreviewDates.length > 0 ? `${bulkPreviewDates.length} ` : ''}Slots</Text>}
+              {bulkCreating ? <ActivityIndicator color={colours.charcoalDark} /> : <Text style={overlayStyles.createBtnText}>Create {bulkPreviewDates.length > 0 ? `${bulkPreviewDates.length} ` : ''}Dines</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setShowBulk(false); resetBulkForm(); }} style={overlayStyles.cancelBtn}>
               <Text style={overlayStyles.cancelText}>Cancel</Text>

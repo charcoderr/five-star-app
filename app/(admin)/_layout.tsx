@@ -29,7 +29,7 @@ export default function AdminLayout() {
       }}
     >
       <Tabs.Screen name="dashboard"   options={{ title: 'Home',    tabBarIcon: tabIcon('home-outline') }} />
-      <Tabs.Screen name="slots"       options={{ title: 'Slots',   tabBarIcon: tabIcon('calendar-outline') }} />
+      <Tabs.Screen name="slots"       options={{ title: 'Dines',   tabBarIcon: tabIcon('calendar-outline') }} />
       <Tabs.Screen name="reports"     options={{ title: 'Reports', tabBarIcon: tabIcon('document-text-outline') }} />
       <Tabs.Screen name="restaurants" options={{ title: 'Venues',  tabBarIcon: tabIcon('restaurant-outline') }} />
       <Tabs.Screen name="diners"      options={{ title: 'Diners',  tabBarIcon: tabIcon('people-outline') }} />
