@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
 import { useMyAssignments, useUpdateBooking } from '../../hooks/useSlots';
@@ -18,6 +19,7 @@ export default function MyAssignments() {
   const { user } = useAuthStore();
   const { data: assignments, isLoading, refetch, isRefetching } = useMyAssignments(user?.id ?? '');
   const updateBooking = useUpdateBooking();
+  const insets = useSafeAreaInsets();
 
   const [bookingAssignment, setBookingAssignment] = useState<any | null>(null);
   const [bookingDate, setBookingDate] = useState('');
@@ -49,6 +51,7 @@ export default function MyAssignments() {
         bookingNotes: bookingNotes || undefined,
       });
       setBookingAssignment(null);
+      Alert.alert('Booking saved!', 'Your booking has been logged. You can now fill in your report after your visit.');
     } catch {
       Alert.alert('Error', 'Could not save your booking. Please try again.');
     }
@@ -92,7 +95,7 @@ export default function MyAssignments() {
           const slot = item.slot;
           const restaurant = slot?.restaurant;
           const hasBooking = !!item.booking_date;
-          const canFillReport = item.status === 'confirmed' && hasBooking;
+          const canFillReport = item.status === 'confirmed';
           const needsBooking = item.status === 'confirmed' && !hasBooking;
 
           // Display date: prefer diner's booking, fall back to legacy fixed slot date
@@ -100,24 +103,7 @@ export default function MyAssignments() {
           const displayTime = item.booking_time ?? slot?.time;
 
           return (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => {
-                if (canFillReport) {
-                  router.push({
-                    pathname: '/(diner)/report/[assignmentId]',
-                    params: {
-                      assignmentId: item.id,
-                      restaurantId: restaurant?.id ?? '',
-                      restaurantName: restaurant?.name ?? 'Restaurant',
-                    },
-                  });
-                } else if (needsBooking) {
-                  openBookingFor(item);
-                }
-              }}
-              disabled={!canFillReport && !needsBooking}
-            >
+            <View style={styles.card}>
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
                   <Text style={styles.restaurantName}>{restaurant?.name ?? '—'}</Text>
@@ -155,60 +141,70 @@ export default function MyAssignments() {
                 </View>
               )}
 
-              {canFillReport && (
-                <Text style={styles.tapHint}>Tap to fill in your report →</Text>
-              )}
               {needsBooking && (
-                <Text style={styles.tapHint}>Tap to enter your booking →</Text>
+                <TouchableOpacity style={styles.bookingBtn} onPress={() => openBookingFor(item)}>
+                  <Text style={styles.bookingBtnText}>Enter your booking date & time →</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+              {canFillReport && (
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => router.push({
+                    pathname: '/(diner)/report/[assignmentId]',
+                    params: { assignmentId: item.id, restaurantId: restaurant?.id ?? '', restaurantName: restaurant?.name ?? 'Restaurant' },
+                  })}
+                >
+                  <Text style={styles.reportBtnText}>Fill in Report →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           );
         }}
       />
 
       {/* Booking entry modal */}
       <Modal visible={!!bookingAssignment} animationType="slide" transparent>
-        <View style={overlay.wrap}>
-          <ScrollView contentContainerStyle={overlay.sheet}>
-            <Text style={overlay.title}>Enter your booking</Text>
-            <Text style={overlay.subtitle}>
-              {bookingAssignment?.slot?.restaurant?.name}
-            </Text>
-            <Text style={overlay.label}>Date * (YYYY-MM-DD)</Text>
-            <TextInput
-              style={overlay.input}
-              placeholder="2026-05-12"
-              value={bookingDate}
-              onChangeText={setBookingDate}
-              placeholderTextColor={colours.textMuted}
-            />
-            <Text style={overlay.label}>Time * (HH:MM)</Text>
-            <TextInput
-              style={overlay.input}
-              placeholder="19:30"
-              value={bookingTime}
-              onChangeText={setBookingTime}
-              placeholderTextColor={colours.textMuted}
-            />
-            <Text style={overlay.label}>Notes (optional)</Text>
-            <TextInput
-              style={overlay.input}
-              placeholder="e.g. booking name, party size"
-              value={bookingNotes}
-              onChangeText={setBookingNotes}
-              placeholderTextColor={colours.textMuted}
-              multiline
-            />
-            <TouchableOpacity style={overlay.saveBtn} onPress={handleSaveBooking} disabled={updateBooking.isPending}>
-              {updateBooking.isPending
-                ? <ActivityIndicator color={colours.charcoalDark} />
-                : <Text style={overlay.saveText}>Save Booking</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setBookingAssignment(null)} style={overlay.cancelBtn}>
-              <Text style={overlay.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <KeyboardAvoidingView style={overlay.wrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={[overlay.sheet, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={overlay.title}>Enter your booking</Text>
+              <Text style={overlay.subtitle}>{bookingAssignment?.slot?.restaurant?.name}</Text>
+              <Text style={overlay.label}>Date * (YYYY-MM-DD)</Text>
+              <TextInput
+                style={overlay.input}
+                placeholder="2026-05-12"
+                value={bookingDate}
+                onChangeText={setBookingDate}
+                placeholderTextColor={colours.textMuted}
+              />
+              <Text style={overlay.label}>Time * (HH:MM)</Text>
+              <TextInput
+                style={overlay.input}
+                placeholder="19:30"
+                value={bookingTime}
+                onChangeText={setBookingTime}
+                placeholderTextColor={colours.textMuted}
+              />
+              <Text style={overlay.label}>Notes (optional)</Text>
+              <TextInput
+                style={overlay.input}
+                placeholder="e.g. booking name, party size"
+                value={bookingNotes}
+                onChangeText={setBookingNotes}
+                placeholderTextColor={colours.textMuted}
+                multiline
+              />
+              <TouchableOpacity style={overlay.saveBtn} onPress={handleSaveBooking} disabled={updateBooking.isPending}>
+                {updateBooking.isPending
+                  ? <ActivityIndicator color={colours.charcoalDark} />
+                  : <Text style={overlay.saveText}>Save Booking</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setBookingAssignment(null)} style={overlay.cancelBtn}>
+                <Text style={overlay.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -238,11 +234,15 @@ const styles = StyleSheet.create({
   slotNotes: { fontSize: 12, color: colours.textSecondary, marginTop: 6, fontStyle: 'italic' },
   editBookingBtn: { marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4 },
   editBookingText: { fontSize: 12, color: colours.gold, fontWeight: '700' },
+  bookingBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colours.gold + '18', borderRadius: 8, borderWidth: 1, borderColor: colours.gold },
+  bookingBtnText: { fontSize: 13, fontWeight: '700', color: colours.gold },
+  reportBtn: { marginTop: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colours.gold, borderRadius: 10, alignItems: 'center' },
+  reportBtnText: { fontSize: 14, fontWeight: '700', color: colours.charcoalDark },
 });
 
 const overlay = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colours.white, padding: 24, paddingBottom: 40, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheet: { backgroundColor: colours.white, padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '80%' },
   title: { fontSize: 20, fontWeight: '700', color: colours.textPrimary },
   subtitle: { fontSize: 14, color: colours.textSecondary, marginTop: 4, marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', color: colours.textSecondary, marginTop: 12, marginBottom: 6 },

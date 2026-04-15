@@ -234,8 +234,8 @@ const styles = StyleSheet.create({
 });
 
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20 },
-  sheet: { backgroundColor: colours.white, borderRadius: 20, padding: 28, paddingBottom: 32, maxHeight: '85%' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20, paddingTop: 60 },
+  sheet: { backgroundColor: colours.white, borderRadius: 20, padding: 28, paddingBottom: 32, maxHeight: '88%' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   name: { fontSize: 22, fontWeight: '700', color: colours.textPrimary },
   badgePill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
