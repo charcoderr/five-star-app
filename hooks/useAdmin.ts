@@ -6,19 +6,23 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const [slotsRes, reportsRes, dinersRes, restaurantsRes, applicationsRes] = await Promise.all([
+      const [slotsRes, reportsRes, underReviewRes, dinersRes, restaurantsRes, applicationsRes, overdueRes] = await Promise.all([
         supabase.from('slots').select('id, status', { count: 'exact' }).eq('status', 'open'),
         supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'submitted'),
+        supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'under_review'),
         supabase.from('users').select('id', { count: 'exact' }).eq('role', 'diner').eq('status', 'active'),
         supabase.from('restaurants').select('id', { count: 'exact' }),
         supabase.from('users').select('id', { count: 'exact' }).eq('role', 'diner').eq('status', 'pending_approval'),
+        supabase.from('overdue_reports').select('assignment_id', { count: 'exact', head: true }),
       ]);
       return {
         openSlots: slotsRes.count ?? 0,
         pendingReports: reportsRes.count ?? 0,
+        reportsUnderReview: underReviewRes.count ?? 0,
         activeDiners: dinersRes.count ?? 0,
         restaurants: restaurantsRes.count ?? 0,
         pendingApplications: applicationsRes.count ?? 0,
+        overdueReports: overdueRes.count ?? 0,
       };
     },
   });
@@ -108,10 +112,11 @@ export function useReviewReport() {
       answers: Record<string, any>;
       adminNotes?: string;
     }) => {
-      // Mark report as reviewed
+      // Approve & send to restaurant (status moves from submitted/under_review
+      // to sent_to_restaurant, at which point restaurant RLS exposes the row).
       await supabase
         .from('reports')
-        .update({ status: 'reviewed', admin_notes: adminNotes })
+        .update({ status: 'sent_to_restaurant', admin_notes: adminNotes })
         .eq('id', reportId);
 
       // Calculate star rating from scored answers

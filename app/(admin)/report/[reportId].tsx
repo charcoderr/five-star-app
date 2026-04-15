@@ -267,7 +267,7 @@ export default function AdminReportDetail() {
         )}
 
         {/* Admin notes */}
-        {report.status !== 'reviewed' && (
+        {report.status !== 'sent_to_restaurant' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Admin Notes (optional)</Text>
             <TextInput
@@ -291,13 +291,13 @@ export default function AdminReportDetail() {
           >
             {reviewReport.isPending
               ? <ActivityIndicator color={colours.charcoalDark} />
-              : <Text style={styles.reviewBtnText}>Mark as Reviewed & Update Rating</Text>}
+              : <Text style={styles.reviewBtnText}>Approve & Send to Restaurant</Text>}
           </TouchableOpacity>
         )}
 
-        {report.status === 'reviewed' && (
+        {report.status === 'sent_to_restaurant' && (
           <View style={styles.reviewedBanner}>
-            <Text style={styles.reviewedText}>✓ This report has been reviewed</Text>
+            <Text style={styles.reviewedText}>✓ Sent to the restaurant</Text>
           </View>
         )}
 

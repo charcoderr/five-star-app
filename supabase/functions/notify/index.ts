@@ -88,12 +88,12 @@ async function resolveDbWebhook(sb: ReturnType<typeof adminClient>, p: DbWebhook
     case 'reports.UPDATE': {
       const r = p.record;
       const prev = p.old_record;
-      if (r.status !== 'reviewed' || prev?.status === 'reviewed') return null;
+      if (r.status !== 'sent_to_restaurant' || prev?.status === 'sent_to_restaurant') return null;
       return {
         userIds: [r.diner_id],
         type: 'report_reviewed',
-        title: 'Report reviewed',
-        body: 'Wendy has reviewed your report.',
+        title: 'Report sent to restaurant',
+        body: 'Wendy has approved your report and sent it to the restaurant.',
         data: { reportId: r.id },
       };
     }

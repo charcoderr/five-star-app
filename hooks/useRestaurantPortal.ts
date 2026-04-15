@@ -24,12 +24,12 @@ export function useRestaurantStats(restaurantId: string) {
           .eq('restaurant_id', restaurantId)
           .eq('status', 'submitted'),
 
-        // Reports already reviewed (read by the restaurant)
+        // Reports that have been approved and sent to the restaurant
         supabase
           .from('reports')
           .select('id', { count: 'exact', head: true })
           .eq('restaurant_id', restaurantId)
-          .eq('status', 'reviewed'),
+          .eq('status', 'sent_to_restaurant'),
 
         // Current restaurant avg rating
         supabase
@@ -93,7 +93,7 @@ export function useRestaurantActivity(restaurantId: string, limit = 5) {
   });
 }
 
-// Reports visible to the restaurant (reviewed only)
+// Reports visible to the restaurant (only those Wendy has approved + sent)
 export function useRestaurantReports(restaurantId: string) {
   return useQuery({
     queryKey: ['restaurant-reports', restaurantId],
@@ -105,7 +105,7 @@ export function useRestaurantReports(restaurantId: string) {
           assignment:assignments(slot:slots(date, time))
         `)
         .eq('restaurant_id', restaurantId)
-        .eq('status', 'reviewed')
+        .eq('status', 'sent_to_restaurant')
         .order('submitted_at', { ascending: false });
       if (error) throw error;
       return data ?? [];

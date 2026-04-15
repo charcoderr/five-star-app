@@ -156,7 +156,7 @@ select
   'aaaaaaaa-2222-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2025-10-23 21:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Bread Meats Bread St Vincent St — 27 Jan 2026 (Toby Sim) ────────────────
 -- Source: 5StarX Mystery Dine Report - La Vita Feedback - July 2025.docx
@@ -228,7 +228,7 @@ select
   'aaaaaaaa-3333-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2026-01-27 21:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Mezcal — 27 Feb 2026 ────────────────────────────────────────────────────
 -- Source: 5StarX Mystery Dine Feedback - Mezcal - February 2026 copy.docx
@@ -302,7 +302,7 @@ select
   'aaaaaaaa-4444-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2026-02-27 21:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── The Spanish Butcher — Nov 2025 ──────────────────────────────────────────
 -- Source: 5StarX Mystery Dine Spec JR 2025.docx
@@ -377,7 +377,7 @@ select
   'aaaaaaaa-5555-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2025-11-15 21:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Dalziel Park / Lisini Pub Co — 3 Dec 2025 ───────────────────────────────
 -- Source: 5StarX Mystery Dine Report - Lisini Pub Co - Master Copy - December 2025.docx
@@ -453,7 +453,7 @@ select
   'aaaaaaaa-6666-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2025-12-03 21:00:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Porter & Rye — 8 Dec 2025 ───────────────────────────────────────────────
 -- Source: 5StarX Mystery Dining requirements - Porter & Rye Glasgow.docx
@@ -528,7 +528,7 @@ select
   'aaaaaaaa-7777-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2025-12-08 17:00:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Piccolinos Newton Mearns — 19 Mar 2026 (Lesley Sim) ─────────────────────
 -- Source: 5StarX Mystery Dine Report - La Vita Feedback - July 2025-2.docx
@@ -602,7 +602,7 @@ select
   'aaaaaaaa-8888-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2026-03-19 21:00:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── ThunderCat — 13 Sept 2025 (Bucks Bar group) ─────────────────────────────
 -- Source: Customer Experience Report - Bucks Bar group - 2025.pptx
@@ -673,7 +673,7 @@ select
   'aaaaaaaa-9999-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2025-09-13 16:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── Bread Meats Bread Glasgow Fort — 15 Jan 2026 (BMB Group report) ──────────
 -- Source: 5StarX Mystery Dine Feedback - BMB Group - November 2025 onwards.docx
@@ -748,7 +748,7 @@ select
   'aaaaaaaa-aaaa-4000-8000-000000000001',
   (select jsonb_object_agg(qid, ans) from answer_map join qids using (ord)),
   '2026-01-15 20:30:00+00',
-  'reviewed';
+  'sent_to_restaurant';
 
 -- ─── 4. Ratings (calculated from scored answers in each report) ───────────────
 

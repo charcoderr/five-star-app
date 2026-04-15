@@ -79,7 +79,7 @@ export interface Report {
   restaurant_id: string;
   answers: Record<string, ReportAnswer>;
   submitted_at: string | null;
-  status: 'draft' | 'submitted' | 'reviewed';
+  status: 'draft' | 'submitted' | 'under_review' | 'sent_to_restaurant';
 }
 
 export interface Voucher {

@@ -46,7 +46,7 @@ export function useDinerStats(userId: string | undefined) {
           .from('reports')
           .select('answers')
           .eq('diner_id', userId!)
-          .in('status', ['submitted', 'reviewed']),
+          .in('status', ['submitted', 'under_review', 'sent_to_restaurant']),
       ]);
 
       const totalVisits = assignmentsRes.data?.length ?? 0;
@@ -138,7 +138,7 @@ export function useDinerPerformanceMap() {
         supabase
           .from('reports')
           .select('diner_id, answers')
-          .in('status', ['submitted', 'reviewed']),
+          .in('status', ['submitted', 'under_review', 'sent_to_restaurant']),
       ]);
 
       const visitMap: Record<string, number> = {};

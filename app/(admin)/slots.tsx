@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useNotifyDinersForSlot, useNotifyDinersForSlots } from '../../hooks/useSmartNotify';
 import { useAllWaitlistCounts, useSlotWaitlist, useNotifyWaitlist } from '../../hooks/useWaitlist';
+import { useDinerNotes } from '../../hooks/useCrm';
 
 const STATUS_COLOURS: Record<string, string> = {
   open:      colours.scoreGood,
@@ -47,6 +48,27 @@ function generateSlotDates(startDate: string, endDate: string, weekdays: number[
     current.setDate(current.getDate() + 1);
   }
   return dates;
+}
+
+function DinerNotesInline({ dinerId }: { dinerId: string }) {
+  const { data: notes, isLoading } = useDinerNotes(dinerId);
+  if (isLoading) return null;
+  if (!notes || notes.length === 0) return null;
+  const recent = notes.slice(0, 3);
+  return (
+    <View style={modalStyles.notesBlock}>
+      <Text style={modalStyles.notesHeader}>Diner notes ({notes.length})</Text>
+      {recent.map(n => (
+        <View key={n.id} style={modalStyles.noteRow}>
+          <Text style={modalStyles.noteType}>{n.note_type}</Text>
+          <Text style={modalStyles.noteBody}>{n.body}</Text>
+        </View>
+      ))}
+      {notes.length > 3 && (
+        <Text style={modalStyles.notesMore}>+{notes.length - 3} older</Text>
+      )}
+    </View>
+  );
 }
 
 function AssignmentsModal({
@@ -95,6 +117,7 @@ function AssignmentsModal({
               <Text style={[modalStyles.status, { color: STATUS_COLOURS[a.status] ?? colours.textMuted }]}>
                 {a.status.toUpperCase()}
               </Text>
+              <DinerNotesInline dinerId={a.diner_id} />
               {a.status === 'pending' && (
                 <View style={modalStyles.voucherRow}>
                   <Text style={modalStyles.voucherLabel}>£ Voucher value</Text>
@@ -675,4 +698,10 @@ const modalStyles = StyleSheet.create({
   waitlistEmail: { fontSize: 12, color: colours.textSecondary, marginTop: 1 },
   closeBtn: { alignItems: 'center', marginTop: 20, padding: 12 },
   closeBtnText: { fontSize: 14, color: colours.textMuted },
+  notesBlock: { marginTop: 8, padding: 8, backgroundColor: colours.offWhite, borderRadius: 6, borderLeftWidth: 3, borderLeftColor: colours.gold },
+  notesHeader: { fontSize: 11, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  noteRow: { marginTop: 4 },
+  noteType: { fontSize: 10, fontWeight: '700', color: colours.gold, textTransform: 'uppercase' },
+  noteBody: { fontSize: 12, color: colours.textPrimary, marginTop: 1 },
+  notesMore: { fontSize: 11, color: colours.textMuted, marginTop: 4, fontStyle: 'italic' },
 });
