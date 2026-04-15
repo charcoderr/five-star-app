@@ -6,9 +6,10 @@ import { SkeletonList } from '../../components/Skeleton';
 import { EmptyState } from '../../components/EmptyState';
 
 const STATUS_CONFIG: Record<string, { label: string; colour: string }> = {
-  draft:     { label: 'Draft',     colour: colours.textMuted },
-  submitted: { label: 'Submitted', colour: colours.scoreFair },
-  reviewed:  { label: 'Reviewed',  colour: colours.scoreGood },
+  submitted:          { label: 'To Review',          colour: colours.scoreFair },
+  under_review:       { label: 'In Review',           colour: colours.gold },
+  sent_to_restaurant: { label: 'Sent to Restaurant',  colour: colours.scoreGood },
+  reviewed:           { label: 'Reviewed',            colour: colours.scoreGood },
 };
 
 export default function AdminReports() {
@@ -46,7 +47,7 @@ export default function AdminReports() {
           />
         }
         renderItem={({ item }) => {
-          const status = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.draft;
+          const status = STATUS_CONFIG[item.status] ?? { label: item.status, colour: colours.textMuted };
           return (
             <TouchableOpacity
               style={[styles.card, item.status === 'submitted' && styles.cardHighlight]}
