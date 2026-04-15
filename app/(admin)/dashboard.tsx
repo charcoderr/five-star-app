@@ -93,7 +93,22 @@ export default function AdminDashboard() {
         </View>
       </View>
 
-      {/* Attention banner for pending applications */}
+      {/* Pending slot applications banner */}
+      {(stats?.pendingSlotClaims ?? 0) > 0 && (
+        <TouchableOpacity
+          style={[styles.banner, styles.bannerGold]}
+          onPress={() => router.push('/(admin)/slots')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="ticket-outline" size={18} color={colours.goldDark} style={{ marginRight: 8 }} />
+          <Text style={styles.bannerText}>
+            {stats?.pendingSlotClaims} diner voucher request{stats?.pendingSlotClaims !== 1 ? 's' : ''} to approve
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colours.gold} />
+        </TouchableOpacity>
+      )}
+
+      {/* Pending diner applications banner */}
       {(stats?.pendingApplications ?? 0) > 0 && (
         <TouchableOpacity
           style={styles.banner}
@@ -145,7 +160,8 @@ const styles = StyleSheet.create({
   brand: { fontSize: 22, fontWeight: '800', color: colours.gold, letterSpacing: 0.5 },
   brandSub: { fontSize: 10, fontWeight: '700', color: colours.charcoalLight, letterSpacing: 2 },
 
-  banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold + '18', borderLeftWidth: 3, borderLeftColor: colours.gold, marginHorizontal: 16, marginTop: 16, borderRadius: 12, padding: 14 },
+  banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold + '18', borderLeftWidth: 3, borderLeftColor: colours.gold, marginHorizontal: 16, marginTop: 12, borderRadius: 12, padding: 14 },
+  bannerGold: { backgroundColor: colours.scoreGood + '18', borderLeftColor: colours.scoreGood },
   bannerText: { fontSize: 13, fontWeight: '600', color: colours.goldDark, flex: 1 },
 
   sectionTitle: { fontSize: 12, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginHorizontal: 20, marginTop: 26, marginBottom: 12 },

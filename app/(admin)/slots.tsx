@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
 });
 
 const overlayStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', paddingTop: '15%' },
   sheet: { backgroundColor: colours.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 },
   title: { fontSize: 20, fontWeight: '700', color: colours.textPrimary, marginBottom: 6 },
   subtitle: { fontSize: 13, color: colours.textSecondary, marginBottom: 20, lineHeight: 18 },

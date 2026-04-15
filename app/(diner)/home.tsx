@@ -122,6 +122,7 @@ export default function DinerHome() {
       </View>
 
       <SectionList
+        stickySectionHeadersEnabled={false}
         contentContainerStyle={!hasOpen && !hasClaimed ? styles.emptyContainer : styles.list}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={handleRefetch} tintColor={colours.gold} />

@@ -6,7 +6,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const [slotsRes, reportsRes, underReviewRes, dinersRes, restaurantsRes, applicationsRes, overdueRes] = await Promise.all([
+      const [slotsRes, reportsRes, underReviewRes, dinersRes, restaurantsRes, applicationsRes, overdueRes, slotClaimsRes] = await Promise.all([
         supabase.from('slots').select('id, status', { count: 'exact' }).eq('status', 'open'),
         supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'submitted'),
         supabase.from('reports').select('id', { count: 'exact' }).eq('status', 'under_review'),
@@ -14,6 +14,7 @@ export function useDashboardStats() {
         supabase.from('restaurants').select('id', { count: 'exact' }),
         supabase.from('users').select('id', { count: 'exact' }).eq('role', 'diner').eq('status', 'pending_approval'),
         supabase.from('overdue_reports').select('assignment_id', { count: 'exact', head: true }),
+        supabase.from('assignments').select('id', { count: 'exact' }).eq('status', 'pending'),
       ]);
       return {
         openSlots: slotsRes.count ?? 0,
@@ -23,6 +24,7 @@ export function useDashboardStats() {
         restaurants: restaurantsRes.count ?? 0,
         pendingApplications: applicationsRes.count ?? 0,
         overdueReports: overdueRes.count ?? 0,
+        pendingSlotClaims: slotClaimsRes.count ?? 0,
       };
     },
   });

@@ -169,21 +169,36 @@ export default function MyAssignments() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={overlay.title}>Enter your booking</Text>
               <Text style={overlay.subtitle}>{bookingAssignment?.slot?.restaurant?.name}</Text>
-              <Text style={overlay.label}>Date * (YYYY-MM-DD)</Text>
+              <Text style={overlay.label}>Date *</Text>
               <TextInput
                 style={overlay.input}
-                placeholder="2026-05-12"
+                placeholder="DD/MM/YYYY  e.g. 12/05/2026"
                 value={bookingDate}
-                onChangeText={setBookingDate}
+                onChangeText={text => {
+                  // Accept DD/MM/YYYY and convert to YYYY-MM-DD for storage
+                  const parts = text.replace(/[^\d/]/g, '').split('/');
+                  if (parts.length === 3 && parts[2].length === 4) {
+                    setBookingDate(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);
+                  } else {
+                    setBookingDate(text);
+                  }
+                }}
                 placeholderTextColor={colours.textMuted}
+                keyboardType="numbers-and-punctuation"
               />
-              <Text style={overlay.label}>Time * (HH:MM)</Text>
+              {bookingDate.match(/^\d{4}-\d{2}-\d{2}$/) && (
+                <Text style={overlay.datePreview}>
+                  {new Date(bookingDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              )}
+              <Text style={overlay.label}>Time *</Text>
               <TextInput
                 style={overlay.input}
-                placeholder="19:30"
+                placeholder="e.g. 19:30"
                 value={bookingTime}
                 onChangeText={setBookingTime}
                 placeholderTextColor={colours.textMuted}
+                keyboardType="numbers-and-punctuation"
               />
               <Text style={overlay.label}>Notes (optional)</Text>
               <TextInput
@@ -251,4 +266,5 @@ const overlay = StyleSheet.create({
   saveText: { fontSize: 15, fontWeight: '700', color: colours.charcoalDark },
   cancelBtn: { alignItems: 'center', padding: 14, marginTop: 4 },
   cancelText: { fontSize: 14, color: colours.textMuted },
+  datePreview: { fontSize: 13, color: colours.scoreGood, fontWeight: '600', marginTop: 4, marginBottom: 4 },
 });
