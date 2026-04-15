@@ -5,7 +5,7 @@ import {
   TextInput, ScrollView,
 } from 'react-native';
 import { colours } from '../../utils/theme';
-import { useAllSlots, useCreateSlot, useSlotAssignments } from '../../hooks/useSlots';
+import { useAllSlots, useCreateSlot, useSlotAssignments, useUpdateSlot, useCancelSlot } from '../../hooks/useSlots';
 import { useIssueVoucher } from '../../hooks/useVouchers';
 import { useAuthStore } from '../../stores/authStore';
 import { useQuery } from '@tanstack/react-query';
@@ -177,11 +177,30 @@ export default function AdminSlots() {
   const { data: restaurants } = useRestaurants();
   const { data: waitlistCounts } = useAllWaitlistCounts();
   const createSlot = useCreateSlot();
+  const updateSlot = useUpdateSlot();
+  const cancelSlot = useCancelSlot();
   const notifySlot = useNotifyDinersForSlot();
   const notifySlots = useNotifyDinersForSlots();
 
+  const [search, setSearch] = useState('');
+
+  const sortedSlots = useMemo(() => {
+    const statusOrder: Record<string, number> = { open: 0, claimed: 1, completed: 2, cancelled: 3 };
+    return [...(slots ?? [])]
+      .filter(s => !search || s.restaurant?.name?.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+        if (statusDiff !== 0) return statusDiff;
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+  }, [slots, search]);
+
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any | null>(null);
+  const [editingSlot, setEditingSlot] = useState<any | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editMaxCovers, setEditMaxCovers] = useState('2');
   const [restaurantId, setRestaurantId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -207,6 +226,44 @@ export default function AdminSlots() {
 
   function resetSingleForm() { setRestaurantId(''); setDate(''); setTime(''); setMaxCovers('2'); }
   function resetBulkForm() { setBulkRestaurantId(''); setBulkWeekdays([]); setBulkTime(''); setBulkMaxCovers('2'); setBulkStartDate(''); setBulkEndDate(''); }
+
+  function openEdit(slot: any) {
+    setEditingSlot(slot);
+    setEditDate(slot.date ?? '');
+    setEditTime(slot.time?.slice(0, 5) ?? '');
+    setEditMaxCovers(String(slot.max_covers ?? 2));
+  }
+
+  async function handleSaveEdit() {
+    if (!editingSlot || !editDate || !editTime) { Alert.alert('Fill in all fields'); return; }
+    try {
+      await updateSlot.mutateAsync({ id: editingSlot.id, date: editDate, time: editTime, max_covers: parseInt(editMaxCovers, 10) || 2 });
+      setEditingSlot(null);
+    } catch {
+      Alert.alert('Error', 'Could not update slot.');
+    }
+  }
+
+  function handleCancelSlot(slot: any) {
+    Alert.alert(
+      'Cancel Slot?',
+      `Cancel the slot at ${slot.restaurant?.name ?? 'this restaurant'} on ${new Date(slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}?`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Cancel Slot',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelSlot.mutateAsync(slot.id);
+            } catch {
+              Alert.alert('Error', 'Could not cancel slot.');
+            }
+          },
+        },
+      ]
+    );
+  }
 
   function offerNotify(slotId: string, rId: string, slotDate: string, slotTime: string) {
     const restaurant = restaurants?.find(r => r.id === rId);
@@ -331,10 +388,21 @@ export default function AdminSlots() {
         </View>
       </View>
 
+      <View style={styles.searchBar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search restaurants..."
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor={colours.textMuted}
+          clearButtonMode="while-editing"
+        />
+      </View>
+
       <FlatList
-        data={slots}
+        data={sortedSlots}
         keyExtractor={item => item.id}
-        contentContainerStyle={slots?.length === 0 ? styles.emptyContainer : styles.list}
+        contentContainerStyle={sortedSlots.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -345,10 +413,13 @@ export default function AdminSlots() {
         }
         renderItem={({ item }) => {
           const waitingCount = waitlistCounts?.[item.id] ?? 0;
+          const canEdit = item.status === 'open';
+          const canCancel = item.status === 'open' || item.status === 'claimed';
           return (
             <TouchableOpacity
               style={styles.card}
               onPress={() => item.status === 'claimed' ? setSelectedSlot(item) : null}
+              activeOpacity={item.status === 'claimed' ? 0.7 : 1}
             >
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
@@ -356,7 +427,7 @@ export default function AdminSlots() {
                   <Text style={styles.dateTime}>
                     {new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · {item.time?.slice(0, 5)}
                   </Text>
-                  <Text style={styles.covers}>👥 Up to {item.max_covers} guests</Text>
+                  <Text style={styles.covers}>Up to {item.max_covers} guests</Text>
                 </View>
                 <View style={styles.cardRight}>
                   <View style={[styles.statusBadge, { backgroundColor: (STATUS_COLOURS[item.status] ?? colours.textMuted) + '22', borderColor: STATUS_COLOURS[item.status] ?? colours.textMuted }]}>
@@ -373,6 +444,20 @@ export default function AdminSlots() {
               </View>
               {item.status === 'claimed' && (
                 <Text style={styles.tapHint}>Tap to review claim →</Text>
+              )}
+              {(canEdit || canCancel) && (
+                <View style={styles.cardActions}>
+                  {canEdit && (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
+                      <Text style={styles.actionBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                  {canCancel && (
+                    <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleCancelSlot(item)}>
+                      <Text style={[styles.actionBtnText, styles.actionBtnTextDanger]}>Cancel Slot</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
           );
@@ -394,10 +479,10 @@ export default function AdminSlots() {
                 ))}
               </View>
             </ScrollView>
-            <Text style={overlayStyles.label}>Date * (YYYY-MM-DD)</Text>
+            <Text style={overlayStyles.label}>Voucher Expiry Deadline * (YYYY-MM-DD)</Text>
             <TextInput style={overlayStyles.input} placeholder="e.g. 2025-08-15" value={date} onChangeText={setDate} placeholderTextColor={colours.textMuted} />
-            <Text style={overlayStyles.label}>Time * (HH:MM)</Text>
-            <TextInput style={overlayStyles.input} placeholder="e.g. 19:30" value={time} onChangeText={setTime} placeholderTextColor={colours.textMuted} />
+            <Text style={overlayStyles.label}>Notes</Text>
+            <TextInput style={overlayStyles.input} placeholder="e.g. Dinner for 2, any day in April" value={time} onChangeText={setTime} placeholderTextColor={colours.textMuted} />
             <Text style={overlayStyles.label}>Max Covers</Text>
             <TextInput style={overlayStyles.input} placeholder="2" value={maxCovers} onChangeText={setMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
             <TouchableOpacity style={overlayStyles.createBtn} onPress={handleCreate} disabled={createSlot.isPending}>
@@ -462,6 +547,28 @@ export default function AdminSlots() {
         </View>
       </Modal>
 
+      {/* Edit Slot Modal */}
+      <Modal visible={!!editingSlot} animationType="slide" transparent>
+        <View style={overlayStyles.overlay}>
+          <ScrollView contentContainerStyle={overlayStyles.sheet}>
+            <Text style={overlayStyles.title}>Edit Slot</Text>
+            <Text style={overlayStyles.subtitle}>{editingSlot?.restaurant?.name}</Text>
+            <Text style={overlayStyles.label}>Date * (YYYY-MM-DD)</Text>
+            <TextInput style={overlayStyles.input} value={editDate} onChangeText={setEditDate} placeholderTextColor={colours.textMuted} />
+            <Text style={overlayStyles.label}>Time * (HH:MM)</Text>
+            <TextInput style={overlayStyles.input} value={editTime} onChangeText={setEditTime} placeholderTextColor={colours.textMuted} />
+            <Text style={overlayStyles.label}>Max Covers</Text>
+            <TextInput style={overlayStyles.input} value={editMaxCovers} onChangeText={setEditMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
+            <TouchableOpacity style={overlayStyles.createBtn} onPress={handleSaveEdit} disabled={updateSlot.isPending}>
+              {updateSlot.isPending ? <ActivityIndicator color={colours.charcoalDark} /> : <Text style={overlayStyles.createBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setEditingSlot(null)} style={overlayStyles.cancelBtn}>
+              <Text style={overlayStyles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Assignments + Waitlist Modal */}
       <Modal visible={!!selectedSlot} animationType="slide" transparent>
         <View style={overlayStyles.overlay}>
@@ -491,6 +598,8 @@ const styles = StyleSheet.create({
   bulkBtnText: { fontSize: 14, fontWeight: '700', color: colours.gold },
   addBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   addBtnText: { fontSize: 14, fontWeight: '700', color: colours.charcoalDark },
+  searchBar: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
+  searchInput: { backgroundColor: colours.offWhite, borderWidth: 1, borderColor: colours.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, fontSize: 14, color: colours.textPrimary },
   list: { padding: 16, gap: 12 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   empty: { alignItems: 'center' },
@@ -509,6 +618,11 @@ const styles = StyleSheet.create({
   waitlistBadge: { backgroundColor: colours.scoreFair + '22', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colours.scoreFair },
   waitlistBadgeText: { fontSize: 10, fontWeight: '700', color: colours.scoreFair },
   tapHint: { fontSize: 12, color: colours.gold, marginTop: 10, fontWeight: '600' },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colours.border },
+  actionBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1.5, borderColor: colours.gold, backgroundColor: colours.offWhite },
+  actionBtnDanger: { borderColor: colours.error, backgroundColor: colours.offWhite },
+  actionBtnText: { fontSize: 12, fontWeight: '700', color: colours.gold },
+  actionBtnTextDanger: { color: colours.error },
 });
 
 const overlayStyles = StyleSheet.create({

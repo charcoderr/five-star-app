@@ -6,8 +6,6 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
 import { useReportDetail, useReviewReport } from '../../../hooks/useAdmin';
-import { PROFORMA_CATEGORIES } from '../../../utils/defaultProforma';
-import { ProformaQuestion } from '../../../types';
 
 function ScoreBadge({ score }: { score: number }) {
   const colours_map = [colours.scorePoor, colours.scoreFair, colours.scoreGood, colours.scoreExcellent];
@@ -34,13 +32,39 @@ export default function AdminReportDetail() {
     return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
   }
 
-  const { report, photos } = data ?? {};
+  const { report, photos, proformaQuestions } = data ?? {};
   if (!report) return <View style={styles.centered}><Text>Report not found.</Text></View>;
 
-  // Group questions from answers by matching to proforma categories
-  // We work with raw answers since we don't have the proforma here
   const answers = report.answers ?? {};
-  const answeredKeys = Object.keys(answers);
+
+  // Build a lookup map: questionId → question object (with label, category, type, order)
+  const questionMap: Record<string, any> = {};
+  for (const q of (proformaQuestions ?? [])) {
+    if (q?.id) questionMap[q.id] = q;
+  }
+
+  // Collect answered question IDs that exist in the proforma, sorted by order
+  // Group by category
+  const categories: Record<string, { question: any; answer: any }[]> = {};
+  const unmappedAnswers: { qId: string; answer: any }[] = [];
+
+  for (const [qId, answer] of Object.entries(answers)) {
+    const q = questionMap[qId];
+    if (q) {
+      const cat = q.category ?? 'Other';
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push({ question: q, answer });
+    } else {
+      unmappedAnswers.push({ qId, answer: answer as any });
+    }
+  }
+
+  // Sort each category's questions by order
+  for (const cat of Object.keys(categories)) {
+    categories[cat].sort((a, b) => (a.question.order ?? 0) - (b.question.order ?? 0));
+  }
+
+  const categoryOrder = ['Booking', 'External', 'Internal', 'Service', 'Dining', 'Facilities', 'Wrap Up', 'Other'];
 
   function handleReview() {
     Alert.alert(
@@ -165,60 +189,66 @@ export default function AdminReportDetail() {
           </Text></Text>
         </View>
 
-        {/* Answers by category */}
-        {PROFORMA_CATEGORIES.map(category => {
-          const catAnswers = Object.entries(answers).filter(([, a]: any) =>
-            a.score !== undefined || a.value !== undefined || a.text
-          );
-          if (catAnswers.length === 0) return null;
-          // We show all answers — without the original proforma we can't filter by category
-          return null;
-        })}
-
-        {/* All scored answers */}
-        {scoredAnswers.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Scored Questions ({scoredAnswers.length})</Text>
-            {Object.entries(answers)
-              .filter(([, a]: any) => a.score !== undefined)
-              .map(([qId, a]: any) => (
-                <View key={qId} style={styles.answerRow}>
-                  <ScoreBadge score={a.score} />
-                  {a.notes ? <Text style={styles.answerNotes}>"{a.notes}"</Text> : null}
+        {/* Answers grouped by category */}
+        {categoryOrder
+          .filter(cat => categories[cat]?.length > 0)
+          .map(cat => {
+            const items = categories[cat];
+            const scored = items.filter(i => i.answer?.score !== undefined);
+            const catTotal = scored.reduce((s, i) => s + (i.answer.score ?? 0), 0);
+            const catMax = scored.length * 3;
+            return (
+              <View key={cat} style={styles.section}>
+                <View style={styles.catHeader}>
+                  <Text style={styles.sectionTitle}>{cat}</Text>
+                  {catMax > 0 && (
+                    <Text style={styles.catScore}>{catTotal}/{catMax}</Text>
+                  )}
                 </View>
-              ))}
-          </View>
-        )}
+                {items.map(({ question, answer }) => (
+                  <View key={question.id} style={styles.qRow}>
+                    <Text style={styles.qLabel}>{question.order}. {question.label}</Text>
+                    <View style={styles.qAnswer}>
+                      {answer.score !== undefined && <ScoreBadge score={answer.score} />}
+                      {answer.value !== undefined && (
+                        <View style={[styles.yesNoBadge, { backgroundColor: answer.value ? colours.scoreGood + '22' : colours.scorePoor + '22', borderColor: answer.value ? colours.scoreGood : colours.scorePoor }]}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: answer.value ? colours.scoreGood : colours.scorePoor }}>
+                            {answer.value ? 'Yes' : 'No'}
+                          </Text>
+                        </View>
+                      )}
+                      {answer.text ? (
+                        <Text style={styles.qText}>"{answer.text}"</Text>
+                      ) : null}
+                      {answer.notes ? (
+                        <Text style={styles.qNotes}>Note: {answer.notes}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            );
+          })
+        }
 
-        {/* Yes/No answers */}
-        {Object.entries(answers).filter(([, a]: any) => a.value !== undefined).length > 0 && (
+        {/* Fallback: answers with no matching proforma question */}
+        {unmappedAnswers.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Yes / No Questions</Text>
-            {Object.entries(answers)
-              .filter(([, a]: any) => a.value !== undefined)
-              .map(([qId, a]: any) => (
-                <View key={qId} style={styles.answerRow}>
-                  <View style={[styles.yesNoBadge, { backgroundColor: a.value ? colours.scoreGood + '22' : colours.scorePoor + '22', borderColor: a.value ? colours.scoreGood : colours.scorePoor }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: a.value ? colours.scoreGood : colours.scorePoor }}>
-                      {a.value ? 'Yes' : 'No'}
+            <Text style={styles.sectionTitle}>Additional Answers</Text>
+            {unmappedAnswers.map(({ qId, answer }: any) => (
+              <View key={qId} style={styles.qRow}>
+                {answer.score !== undefined && <ScoreBadge score={answer.score} />}
+                {answer.value !== undefined && (
+                  <View style={[styles.yesNoBadge, { backgroundColor: answer.value ? colours.scoreGood + '22' : colours.scorePoor + '22', borderColor: answer.value ? colours.scoreGood : colours.scorePoor }]}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: answer.value ? colours.scoreGood : colours.scorePoor }}>
+                      {answer.value ? 'Yes' : 'No'}
                     </Text>
                   </View>
-                </View>
-              ))}
-          </View>
-        )}
-
-        {/* Free text answers */}
-        {Object.entries(answers).filter(([, a]: any) => a.text).length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Written Responses</Text>
-            {Object.entries(answers)
-              .filter(([, a]: any) => a.text)
-              .map(([qId, a]: any) => (
-                <View key={qId} style={styles.textAnswer}>
-                  <Text style={styles.textAnswerContent}>"{a.text}"</Text>
-                </View>
-              ))}
+                )}
+                {answer.text ? <Text style={styles.qText}>"{answer.text}"</Text> : null}
+                {answer.notes ? <Text style={styles.qNotes}>Note: {answer.notes}</Text> : null}
+              </View>
+            ))}
           </View>
         )}
 
@@ -301,8 +331,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
   detailRow: { fontSize: 13, color: colours.textSecondary, marginBottom: 6 },
   detailValue: { color: colours.textPrimary, fontWeight: '600' },
-  answerRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colours.border, gap: 4 },
-  answerNotes: { fontSize: 13, color: colours.textSecondary, fontStyle: 'italic' },
+  catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  catScore: { fontSize: 13, fontWeight: '700', color: colours.gold },
+  qRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colours.border + '88', gap: 6 },
+  qLabel: { fontSize: 13, color: colours.textPrimary, lineHeight: 18, fontWeight: '500' },
+  qAnswer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 },
+  qNotes: { fontSize: 12, color: colours.textSecondary, fontStyle: 'italic', width: '100%' },
+  qText: { fontSize: 13, color: colours.textPrimary, fontStyle: 'italic', lineHeight: 19, flex: 1 },
   yesNoBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, alignSelf: 'flex-start' },
   textAnswer: { backgroundColor: colours.offWhite, borderRadius: 8, padding: 12, marginBottom: 8 },
   textAnswerContent: { fontSize: 14, color: colours.textPrimary, lineHeight: 20, fontStyle: 'italic' },

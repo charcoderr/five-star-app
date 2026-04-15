@@ -65,6 +65,20 @@ export function useReportDetail(reportId: string) {
       ]);
       if (reportRes.error) throw reportRes.error;
 
+      // Fetch proforma so we can show question labels alongside answers
+      const restaurantId = reportRes.data?.restaurant?.id;
+      let proformaQuestions: any[] = [];
+      if (restaurantId) {
+        const { data: pfData } = await supabase
+          .from('proformas')
+          .select('questions')
+          .eq('restaurant_id', restaurantId)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        proformaQuestions = pfData?.questions ?? [];
+      }
+
       // Get signed URLs for photos
       const photos = await Promise.all(
         (photosRes.data ?? []).map(async (p: any) => {
@@ -74,7 +88,7 @@ export function useReportDetail(reportId: string) {
           return { ...p, url: data?.signedUrl };
         })
       );
-      return { report: reportRes.data, photos };
+      return { report: reportRes.data, photos, proformaQuestions };
     },
     enabled: !!reportId,
   });

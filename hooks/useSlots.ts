@@ -129,6 +129,40 @@ export function useCreateSlot() {
   });
 }
 
+// Admin: update an existing slot
+export function useUpdateSlot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, date, time, max_covers }: { id: string; date: string; time: string; max_covers: number }) => {
+      const { error } = await supabase
+        .from('slots')
+        .update({ date, time, max_covers })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
+  });
+}
+
+// Admin: cancel a slot (sets status to cancelled)
+export function useCancelSlot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (slotId: string) => {
+      const { error } = await supabase
+        .from('slots')
+        .update({ status: 'cancelled' })
+        .eq('id', slotId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
+  });
+}
+
 // Admin: confirm an assignment
 export function useConfirmAssignment() {
   const queryClient = useQueryClient();

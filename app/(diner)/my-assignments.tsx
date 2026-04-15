@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
@@ -16,6 +17,11 @@ const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
 export default function MyAssignments() {
   const { user } = useAuthStore();
   const { data: assignments, isLoading, refetch, isRefetching } = useMyAssignments(user?.id ?? '');
+
+  const sortedAssignments = useMemo(() => {
+    const order: Record<string, number> = { confirmed: 0, pending: 1, completed: 2, cancelled: 3 };
+    return [...(assignments ?? [])].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  }, [assignments]);
 
   if (isLoading) {
     return (
@@ -37,9 +43,9 @@ export default function MyAssignments() {
       </View>
 
       <FlatList
-        data={assignments}
+        data={sortedAssignments}
         keyExtractor={item => item.id}
-        contentContainerStyle={assignments?.length === 0 ? styles.emptyContainer : styles.list}
+        contentContainerStyle={sortedAssignments.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colours.gold} />}
         ListEmptyComponent={
           <EmptyState

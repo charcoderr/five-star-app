@@ -144,7 +144,7 @@ export default function RestaurantCrmDetail() {
   if (!data?.restaurant) {
     return (
       <View style={styles.centered}>
-        <EmptyState icon="sad-outline" title="Restaurant not found" ctaLabel="Back" onCtaPress={() => router.back()} />
+        <EmptyState icon="sad-outline" title="Restaurant not found" ctaLabel="Back" onCtaPress={() => router.push('/(admin)/restaurants')} />
       </View>
     );
   }
@@ -155,7 +155,7 @@ export default function RestaurantCrmDetail() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.push('/(admin)/restaurants')}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <View style={styles.headerText}>

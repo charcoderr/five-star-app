@@ -104,8 +104,21 @@ export default function AdminDiners() {
                 );
               })()}
             </View>
-            <Text style={modalStyles.email}>{selected?.email} · {selected?.phone}</Text>
-            <Text style={modalStyles.city}>{selected?.city}</Text>
+            <View style={modalStyles.contactCard}>
+              <Text style={modalStyles.contactTitle}>Contact Information</Text>
+              <View style={modalStyles.contactRow}>
+                <Text style={modalStyles.contactLabel}>Email</Text>
+                <Text style={modalStyles.contactValue}>{selected?.email ?? '—'}</Text>
+              </View>
+              <View style={modalStyles.contactRow}>
+                <Text style={modalStyles.contactLabel}>Phone</Text>
+                <Text style={modalStyles.contactValue}>{selected?.phone ?? '—'}</Text>
+              </View>
+              <View style={modalStyles.contactRow}>
+                <Text style={modalStyles.contactLabel}>City</Text>
+                <Text style={modalStyles.contactValue}>{selected?.city ?? '—'}</Text>
+              </View>
+            </View>
 
             {selected && perfMap?.[selected.id] && selected.status === 'active' && (
               <View style={modalStyles.perfCard}>
@@ -221,14 +234,17 @@ const styles = StyleSheet.create({
 });
 
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colours.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20 },
+  sheet: { backgroundColor: colours.white, borderRadius: 20, padding: 28, paddingBottom: 32, maxHeight: '85%' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   name: { fontSize: 22, fontWeight: '700', color: colours.textPrimary },
   badgePill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   badgePillText: { fontSize: 12, fontWeight: '700' },
-  email: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
-  city: { fontSize: 13, color: colours.textMuted, marginTop: 2, marginBottom: 16 },
+  contactCard: { backgroundColor: colours.offWhite, borderRadius: 12, padding: 14, marginTop: 12, marginBottom: 16, gap: 8 },
+  contactTitle: { fontSize: 11, fontWeight: '700', color: colours.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  contactRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  contactLabel: { fontSize: 13, fontWeight: '600', color: colours.textSecondary, width: 60 },
+  contactValue: { fontSize: 13, color: colours.textPrimary, flex: 1, textAlign: 'right' },
   perfCard: { flexDirection: 'row', backgroundColor: colours.offWhite, borderRadius: 12, padding: 14, marginBottom: 16, alignItems: 'center' },
   perfStat: { flex: 1, alignItems: 'center' },
   perfDivider: { width: 1, height: 32, backgroundColor: colours.border },

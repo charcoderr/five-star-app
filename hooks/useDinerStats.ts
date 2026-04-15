@@ -6,16 +6,16 @@ export type BadgeTier = 'None' | 'Bronze' | 'Silver' | 'Gold' | 'Elite';
 
 export const BADGE_CONFIG: Record<BadgeTier, { emoji: string; colour: string; minVisits: number; nextAt: number | null }> = {
   None:   { emoji: '—',  colour: '#999999', minVisits: 0,  nextAt: 1  },
-  Bronze: { emoji: '🥉', colour: '#CD7F32', minVisits: 1,  nextAt: 5  },
-  Silver: { emoji: '🥈', colour: '#A8A9AD', minVisits: 5,  nextAt: 10 },
-  Gold:   { emoji: '🥇', colour: '#C9A84C', minVisits: 10, nextAt: 20 },
-  Elite:  { emoji: '⭐', colour: '#C9A84C', minVisits: 20, nextAt: null },
+  Bronze: { emoji: '🥉', colour: '#CD7F32', minVisits: 1,  nextAt: 8  },
+  Silver: { emoji: '🥈', colour: '#A8A9AD', minVisits: 8,  nextAt: 15 },
+  Gold:   { emoji: '🥇', colour: '#C9A84C', minVisits: 15, nextAt: 25 },
+  Elite:  { emoji: '⭐', colour: '#C9A84C', minVisits: 25, nextAt: null },
 };
 
 export function getBadgeTier(visits: number): BadgeTier {
-  if (visits >= 20) return 'Elite';
-  if (visits >= 10) return 'Gold';
-  if (visits >= 5) return 'Silver';
+  if (visits >= 25) return 'Elite';
+  if (visits >= 15) return 'Gold';
+  if (visits >= 8) return 'Silver';
   if (visits >= 1) return 'Bronze';
   return 'None';
 }
