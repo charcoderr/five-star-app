@@ -34,10 +34,10 @@ export default function AdminLayout() {
       <Tabs.Screen name="restaurants" options={{ title: 'Venues',  tabBarIcon: tabIcon('restaurant-outline') }} />
       <Tabs.Screen name="diners"      options={{ title: 'Diners',  tabBarIcon: tabIcon('people-outline') }} />
       {/* Hidden screens — navigated to from dashboard quick actions */}
-      <Tabs.Screen name="vouchers"    options={{ href: null }} />
-      <Tabs.Screen name="tcs-editor"  options={{ href: null }} />
-      <Tabs.Screen name="report"      options={{ href: null }} />
-      <Tabs.Screen name="restaurant"  options={{ href: null }} />
+      <Tabs.Screen name="vouchers"    options={{ href: null, tabBarButton: () => null }} />
+      <Tabs.Screen name="tcs-editor"  options={{ href: null, tabBarButton: () => null }} />
+      <Tabs.Screen name="report"      options={{ href: null, tabBarButton: () => null }} />
+      <Tabs.Screen name="restaurant"  options={{ href: null, tabBarButton: () => null }} />
     </Tabs>
   );
 }
