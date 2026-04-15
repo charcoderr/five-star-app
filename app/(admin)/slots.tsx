@@ -117,6 +117,18 @@ function AssignmentsModal({
               <Text style={[modalStyles.status, { color: STATUS_COLOURS[a.status] ?? colours.textMuted }]}>
                 {a.status.toUpperCase()}
               </Text>
+              {a.booking_date && (
+                <Text style={modalStyles.bookingInfo}>
+                  📅 Booked for {new Date(a.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {a.booking_time ? ` at ${a.booking_time.slice(0, 5)}` : ''}
+                </Text>
+              )}
+              {a.status === 'confirmed' && !a.booking_date && (
+                <Text style={modalStyles.awaitingBooking}>⏳ Awaiting diner's booking confirmation</Text>
+              )}
+              {a.booking_notes && (
+                <Text style={modalStyles.bookingNotes}>Note: {a.booking_notes}</Text>
+              )}
               <DinerNotesInline dinerId={a.diner_id} />
               {a.status === 'pending' && (
                 <View style={modalStyles.voucherRow}>
@@ -209,24 +221,27 @@ export default function AdminSlots() {
 
   const sortedSlots = useMemo(() => {
     const statusOrder: Record<string, number> = { open: 0, claimed: 1, completed: 2, cancelled: 3 };
+    // For sort: voucher_expiry takes priority over legacy date.
+    const sortKey = (s: any) => s.voucher_expiry ?? s.date ?? '9999-12-31';
     return [...(slots ?? [])]
       .filter(s => !search || s.restaurant?.name?.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
         const statusDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
         if (statusDiff !== 0) return statusDiff;
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
+        return new Date(sortKey(a)).getTime() - new Date(sortKey(b)).getTime();
       });
   }, [slots, search]);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any | null>(null);
   const [editingSlot, setEditingSlot] = useState<any | null>(null);
-  const [editDate, setEditDate] = useState('');
-  const [editTime, setEditTime] = useState('');
+  const [editVoucherExpiry, setEditVoucherExpiry] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [editMaxCovers, setEditMaxCovers] = useState('2');
   const [restaurantId, setRestaurantId] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  // New voucher-opportunity fields (the slot the diner applies to)
+  const [voucherExpiry, setVoucherExpiry] = useState('');
+  const [notes, setNotes] = useState('');
   const [maxCovers, setMaxCovers] = useState('2');
 
   const [showBulk, setShowBulk] = useState(false);
@@ -247,20 +262,25 @@ export default function AdminSlots() {
     setBulkWeekdays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   }
 
-  function resetSingleForm() { setRestaurantId(''); setDate(''); setTime(''); setMaxCovers('2'); }
+  function resetSingleForm() { setRestaurantId(''); setVoucherExpiry(''); setNotes(''); setMaxCovers('2'); }
   function resetBulkForm() { setBulkRestaurantId(''); setBulkWeekdays([]); setBulkTime(''); setBulkMaxCovers('2'); setBulkStartDate(''); setBulkEndDate(''); }
 
   function openEdit(slot: any) {
     setEditingSlot(slot);
-    setEditDate(slot.date ?? '');
-    setEditTime(slot.time?.slice(0, 5) ?? '');
+    setEditVoucherExpiry(slot.voucher_expiry ?? slot.date ?? '');
+    setEditNotes(slot.notes ?? '');
     setEditMaxCovers(String(slot.max_covers ?? 2));
   }
 
   async function handleSaveEdit() {
-    if (!editingSlot || !editDate || !editTime) { Alert.alert('Fill in all fields'); return; }
+    if (!editingSlot || !editVoucherExpiry) { Alert.alert('Voucher expiry date is required'); return; }
     try {
-      await updateSlot.mutateAsync({ id: editingSlot.id, date: editDate, time: editTime, max_covers: parseInt(editMaxCovers, 10) || 2 });
+      await updateSlot.mutateAsync({
+        id: editingSlot.id,
+        voucher_expiry: editVoucherExpiry,
+        notes: editNotes || null,
+        max_covers: parseInt(editMaxCovers, 10) || 2,
+      });
       setEditingSlot(null);
     } catch {
       Alert.alert('Error', 'Could not update slot.');
@@ -270,7 +290,7 @@ export default function AdminSlots() {
   function handleCancelSlot(slot: any) {
     Alert.alert(
       'Cancel Slot?',
-      `Cancel the slot at ${slot.restaurant?.name ?? 'this restaurant'} on ${new Date(slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}?`,
+      `Cancel the slot at ${slot.restaurant?.name ?? 'this restaurant'}${slot.voucher_expiry ? ` (voucher expires ${new Date(slot.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})` : slot.date ? ` on ${new Date(slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}?`,
       [
         { text: 'Keep', style: 'cancel' },
         {
@@ -317,19 +337,20 @@ export default function AdminSlots() {
   }
 
   async function handleCreate() {
-    if (!restaurantId || !date || !time) { Alert.alert('Please fill in all fields'); return; }
+    if (!restaurantId || !voucherExpiry) { Alert.alert('Restaurant and voucher expiry are required'); return; }
     try {
       const created = await createSlot.mutateAsync({
-        restaurant_id: restaurantId, date, time,
+        restaurant_id: restaurantId,
+        voucher_expiry: voucherExpiry,
+        notes: notes || null,
         max_covers: parseInt(maxCovers, 10) || 2,
         created_by: user!.id,
       });
       setShowCreate(false);
       const savedId = restaurantId;
-      const savedDate = date;
-      const savedTime = time;
+      const savedExpiry = voucherExpiry;
       resetSingleForm();
-      offerNotify(created.id, savedId, savedDate, savedTime);
+      offerNotify(created.id, savedId, savedExpiry, '');
     } catch {
       Alert.alert('Error', 'Could not create slot. Please try again.');
     }
@@ -447,9 +468,20 @@ export default function AdminSlots() {
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
                   <Text style={styles.restaurantName}>{item.restaurant?.name}</Text>
-                  <Text style={styles.dateTime}>
-                    {new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · {item.time?.slice(0, 5)}
-                  </Text>
+                  {item.voucher_expiry ? (
+                    <>
+                      <Text style={styles.dateTime}>
+                        Voucher expires {new Date(item.voucher_expiry).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                      {item.notes ? (
+                        <Text style={styles.covers} numberOfLines={2}>{item.notes}</Text>
+                      ) : null}
+                    </>
+                  ) : item.date ? (
+                    <Text style={styles.dateTime}>
+                      {new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}{item.time ? ` · ${item.time.slice(0, 5)}` : ''}
+                    </Text>
+                  ) : null}
                   <Text style={styles.covers}>Up to {item.max_covers} guests</Text>
                 </View>
                 <View style={styles.cardRight}>
@@ -503,9 +535,9 @@ export default function AdminSlots() {
               </View>
             </ScrollView>
             <Text style={overlayStyles.label}>Voucher Expiry Deadline * (YYYY-MM-DD)</Text>
-            <TextInput style={overlayStyles.input} placeholder="e.g. 2025-08-15" value={date} onChangeText={setDate} placeholderTextColor={colours.textMuted} />
+            <TextInput style={overlayStyles.input} placeholder="e.g. 2026-08-15" value={voucherExpiry} onChangeText={setVoucherExpiry} placeholderTextColor={colours.textMuted} />
             <Text style={overlayStyles.label}>Notes</Text>
-            <TextInput style={overlayStyles.input} placeholder="e.g. Dinner for 2, any day in April" value={time} onChangeText={setTime} placeholderTextColor={colours.textMuted} />
+            <TextInput style={overlayStyles.input} placeholder="e.g. Dinner for 2, any date before expiry" value={notes} onChangeText={setNotes} placeholderTextColor={colours.textMuted} multiline />
             <Text style={overlayStyles.label}>Max Covers</Text>
             <TextInput style={overlayStyles.input} placeholder="2" value={maxCovers} onChangeText={setMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
             <TouchableOpacity style={overlayStyles.createBtn} onPress={handleCreate} disabled={createSlot.isPending}>
@@ -576,10 +608,10 @@ export default function AdminSlots() {
           <ScrollView contentContainerStyle={overlayStyles.sheet}>
             <Text style={overlayStyles.title}>Edit Slot</Text>
             <Text style={overlayStyles.subtitle}>{editingSlot?.restaurant?.name}</Text>
-            <Text style={overlayStyles.label}>Date * (YYYY-MM-DD)</Text>
-            <TextInput style={overlayStyles.input} value={editDate} onChangeText={setEditDate} placeholderTextColor={colours.textMuted} />
-            <Text style={overlayStyles.label}>Time * (HH:MM)</Text>
-            <TextInput style={overlayStyles.input} value={editTime} onChangeText={setEditTime} placeholderTextColor={colours.textMuted} />
+            <Text style={overlayStyles.label}>Voucher Expiry Deadline * (YYYY-MM-DD)</Text>
+            <TextInput style={overlayStyles.input} value={editVoucherExpiry} onChangeText={setEditVoucherExpiry} placeholderTextColor={colours.textMuted} />
+            <Text style={overlayStyles.label}>Notes</Text>
+            <TextInput style={overlayStyles.input} value={editNotes} onChangeText={setEditNotes} placeholderTextColor={colours.textMuted} multiline />
             <Text style={overlayStyles.label}>Max Covers</Text>
             <TextInput style={overlayStyles.input} value={editMaxCovers} onChangeText={setEditMaxCovers} keyboardType="number-pad" placeholderTextColor={colours.textMuted} />
             <TouchableOpacity style={overlayStyles.createBtn} onPress={handleSaveEdit} disabled={updateSlot.isPending}>
@@ -698,6 +730,9 @@ const modalStyles = StyleSheet.create({
   waitlistEmail: { fontSize: 12, color: colours.textSecondary, marginTop: 1 },
   closeBtn: { alignItems: 'center', marginTop: 20, padding: 12 },
   closeBtnText: { fontSize: 14, color: colours.textMuted },
+  bookingInfo: { fontSize: 13, color: colours.scoreGood, marginTop: 6, fontWeight: '600' },
+  awaitingBooking: { fontSize: 12, color: colours.scoreFair, marginTop: 6, fontStyle: 'italic' },
+  bookingNotes: { fontSize: 12, color: colours.textSecondary, marginTop: 2, fontStyle: 'italic' },
   notesBlock: { marginTop: 8, padding: 8, backgroundColor: colours.offWhite, borderRadius: 6, borderLeftWidth: 3, borderLeftColor: colours.gold },
   notesHeader: { fontSize: 11, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   noteRow: { marginTop: 4 },

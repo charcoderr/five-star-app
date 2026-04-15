@@ -104,14 +104,17 @@ export function useClaimSlot() {
   });
 }
 
-// Admin: create a new slot
+// Admin: create a new slot. Either voucher_expiry (new voucher workflow) or
+// date+time (legacy fixed-slot) must be supplied.
 export function useCreateSlot() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (slot: {
       restaurant_id: string;
-      date: string;
-      time: string;
+      date?: string | null;
+      time?: string | null;
+      voucher_expiry?: string | null;
+      notes?: string | null;
       max_covers: number;
       created_by: string;
     }) => {
@@ -129,19 +132,62 @@ export function useCreateSlot() {
   });
 }
 
-// Admin: update an existing slot
+// Admin: update an existing slot. All fields optional so Wendy can edit
+// voucher_expiry / notes on voucher slots without touching date/time, and
+// vice versa for legacy slots.
 export function useUpdateSlot() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, date, time, max_covers }: { id: string; date: string; time: string; max_covers: number }) => {
+    mutationFn: async (payload: {
+      id: string;
+      date?: string | null;
+      time?: string | null;
+      voucher_expiry?: string | null;
+      notes?: string | null;
+      max_covers?: number;
+    }) => {
+      const { id, ...rest } = payload;
       const { error } = await supabase
         .from('slots')
-        .update({ date, time, max_covers })
+        .update(rest)
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
+  });
+}
+
+// Diner: enter the actual booking date/time after Wendy has approved
+// their application. Populates Wendy's calendar.
+export function useUpdateBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      assignmentId,
+      bookingDate,
+      bookingTime,
+      bookingNotes,
+    }: {
+      assignmentId: string;
+      bookingDate: string;
+      bookingTime: string;
+      bookingNotes?: string;
+    }) => {
+      const { error } = await supabase
+        .from('assignments')
+        .update({
+          booking_date: bookingDate,
+          booking_time: bookingTime,
+          booking_notes: bookingNotes ?? null,
+        })
+        .eq('id', assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }

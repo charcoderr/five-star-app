@@ -24,8 +24,12 @@ export interface Restaurant {
 export interface Slot {
   id: string;
   restaurant_id: string;
-  date: string;
-  time: string;
+  // Legacy fixed-slot fields (kept for seeded historical data — nullable now)
+  date: string | null;
+  time: string | null;
+  // Voucher-opportunity fields (new workflow)
+  voucher_expiry: string | null;
+  notes: string | null;
   max_covers: number;
   status: 'open' | 'claimed' | 'completed' | 'cancelled';
   created_by: string;
@@ -38,6 +42,10 @@ export interface Assignment {
   diner_id: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   voucher_id?: string;
+  // Booking the diner entered after Wendy approved them (new workflow)
+  booking_date?: string | null;
+  booking_time?: string | null;
+  booking_notes?: string | null;
   slot?: Slot;
 }
 

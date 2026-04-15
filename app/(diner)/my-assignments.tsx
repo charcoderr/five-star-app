@@ -1,27 +1,58 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { colours } from '../../utils/theme';
-import { useMyAssignments } from '../../hooks/useSlots';
+import { useMyAssignments, useUpdateBooking } from '../../hooks/useSlots';
 import { useAuthStore } from '../../stores/authStore';
 import { SkeletonList } from '../../components/Skeleton';
 import { EmptyState } from '../../components/EmptyState';
 
 const STATUS_LABELS: Record<string, { label: string; colour: string }> = {
-  pending:   { label: 'Awaiting Confirmation', colour: colours.scoreFair },
-  confirmed: { label: 'Confirmed — Fill Report', colour: colours.scoreGood },
-  completed: { label: 'Completed',              colour: colours.charcoal },
-  cancelled: { label: 'Cancelled',              colour: colours.error },
+  pending:   { label: 'Awaiting Approval', colour: colours.scoreFair },
+  confirmed: { label: 'Approved',          colour: colours.scoreGood },
+  completed: { label: 'Completed',         colour: colours.charcoal },
+  cancelled: { label: 'Cancelled',         colour: colours.error },
 };
 
 export default function MyAssignments() {
   const { user } = useAuthStore();
   const { data: assignments, isLoading, refetch, isRefetching } = useMyAssignments(user?.id ?? '');
+  const updateBooking = useUpdateBooking();
+
+  const [bookingAssignment, setBookingAssignment] = useState<any | null>(null);
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingTime, setBookingTime] = useState('');
+  const [bookingNotes, setBookingNotes] = useState('');
 
   const sortedAssignments = useMemo(() => {
     const order: Record<string, number> = { confirmed: 0, pending: 1, completed: 2, cancelled: 3 };
     return [...(assignments ?? [])].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
   }, [assignments]);
+
+  function openBookingFor(item: any) {
+    setBookingAssignment(item);
+    setBookingDate(item.booking_date ?? '');
+    setBookingTime(item.booking_time?.slice(0, 5) ?? '');
+    setBookingNotes(item.booking_notes ?? '');
+  }
+
+  async function handleSaveBooking() {
+    if (!bookingAssignment || !bookingDate || !bookingTime) {
+      Alert.alert('Date and time required', 'Please enter the date and time you booked with the restaurant.');
+      return;
+    }
+    try {
+      await updateBooking.mutateAsync({
+        assignmentId: bookingAssignment.id,
+        bookingDate,
+        bookingTime,
+        bookingNotes: bookingNotes || undefined,
+      });
+      setBookingAssignment(null);
+    } catch {
+      Alert.alert('Error', 'Could not save your booking. Please try again.');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -60,7 +91,13 @@ export default function MyAssignments() {
           const status = STATUS_LABELS[item.status] ?? { label: item.status, colour: colours.textMuted };
           const slot = item.slot;
           const restaurant = slot?.restaurant;
-          const canFillReport = item.status === 'confirmed';
+          const hasBooking = !!item.booking_date;
+          const canFillReport = item.status === 'confirmed' && hasBooking;
+          const needsBooking = item.status === 'confirmed' && !hasBooking;
+
+          // Display date: prefer diner's booking, fall back to legacy fixed slot date
+          const displayDate = item.booking_date ?? slot?.date;
+          const displayTime = item.booking_time ?? slot?.time;
 
           return (
             <TouchableOpacity
@@ -75,9 +112,11 @@ export default function MyAssignments() {
                       restaurantName: restaurant?.name ?? 'Restaurant',
                     },
                   });
+                } else if (needsBooking) {
+                  openBookingFor(item);
                 }
               }}
-              disabled={!canFillReport}
+              disabled={!canFillReport && !needsBooking}
             >
               <View style={styles.cardRow}>
                 <View style={styles.cardInfo}>
@@ -88,23 +127,89 @@ export default function MyAssignments() {
                   <Text style={[styles.statusText, { color: status.colour }]}>{status.label}</Text>
                 </View>
               </View>
-              <View style={styles.pills}>
-                <View style={styles.pill}>
-                  <Text style={styles.pillText}>
-                    📅 {slot?.date ? new Date(slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+
+              {needsBooking ? (
+                <View style={styles.bookingPrompt}>
+                  <Text style={styles.bookingPromptTitle}>Book directly with the restaurant</Text>
+                  <Text style={styles.bookingPromptBody}>
+                    {slot?.voucher_expiry ? `Your voucher is valid until ${new Date(slot.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. ` : ''}
+                    Once you've made a reservation, tap here to log the date and time.
                   </Text>
+                  {slot?.notes ? <Text style={styles.slotNotes}>Wendy's notes: {slot.notes}</Text> : null}
                 </View>
-                <View style={styles.pill}>
-                  <Text style={styles.pillText}>🕐 {slot?.time?.slice(0, 5) ?? '—'}</Text>
+              ) : (
+                <View style={styles.pills}>
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>
+                      📅 {displayDate ? new Date(displayDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>🕐 {displayTime ? displayTime.slice(0, 5) : '—'}</Text>
+                  </View>
+                  {item.status === 'confirmed' && hasBooking && (
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); openBookingFor(item); }} style={styles.editBookingBtn}>
+                      <Text style={styles.editBookingText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              </View>
+              )}
+
               {canFillReport && (
                 <Text style={styles.tapHint}>Tap to fill in your report →</Text>
+              )}
+              {needsBooking && (
+                <Text style={styles.tapHint}>Tap to enter your booking →</Text>
               )}
             </TouchableOpacity>
           );
         }}
       />
+
+      {/* Booking entry modal */}
+      <Modal visible={!!bookingAssignment} animationType="slide" transparent>
+        <View style={overlay.wrap}>
+          <ScrollView contentContainerStyle={overlay.sheet}>
+            <Text style={overlay.title}>Enter your booking</Text>
+            <Text style={overlay.subtitle}>
+              {bookingAssignment?.slot?.restaurant?.name}
+            </Text>
+            <Text style={overlay.label}>Date * (YYYY-MM-DD)</Text>
+            <TextInput
+              style={overlay.input}
+              placeholder="2026-05-12"
+              value={bookingDate}
+              onChangeText={setBookingDate}
+              placeholderTextColor={colours.textMuted}
+            />
+            <Text style={overlay.label}>Time * (HH:MM)</Text>
+            <TextInput
+              style={overlay.input}
+              placeholder="19:30"
+              value={bookingTime}
+              onChangeText={setBookingTime}
+              placeholderTextColor={colours.textMuted}
+            />
+            <Text style={overlay.label}>Notes (optional)</Text>
+            <TextInput
+              style={overlay.input}
+              placeholder="e.g. booking name, party size"
+              value={bookingNotes}
+              onChangeText={setBookingNotes}
+              placeholderTextColor={colours.textMuted}
+              multiline
+            />
+            <TouchableOpacity style={overlay.saveBtn} onPress={handleSaveBooking} disabled={updateBooking.isPending}>
+              {updateBooking.isPending
+                ? <ActivityIndicator color={colours.charcoalDark} />
+                : <Text style={overlay.saveText}>Save Booking</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setBookingAssignment(null)} style={overlay.cancelBtn}>
+              <Text style={overlay.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -123,8 +228,27 @@ const styles = StyleSheet.create({
   address: { fontSize: 13, color: colours.textMuted, marginTop: 2 },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  pills: { flexDirection: 'row', gap: 8 },
+  pills: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   pill: { backgroundColor: colours.offWhite, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   pillText: { fontSize: 12, color: colours.textSecondary, fontWeight: '600' },
   tapHint: { fontSize: 12, color: colours.gold, marginTop: 10, fontWeight: '600' },
+  bookingPrompt: { backgroundColor: colours.gold + '11', borderRadius: 10, padding: 12, borderLeftWidth: 3, borderLeftColor: colours.gold, marginTop: 4 },
+  bookingPromptTitle: { fontSize: 13, fontWeight: '700', color: colours.textPrimary, marginBottom: 4 },
+  bookingPromptBody: { fontSize: 12, color: colours.textSecondary, lineHeight: 17 },
+  slotNotes: { fontSize: 12, color: colours.textSecondary, marginTop: 6, fontStyle: 'italic' },
+  editBookingBtn: { marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4 },
+  editBookingText: { fontSize: 12, color: colours.gold, fontWeight: '700' },
+});
+
+const overlay = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colours.white, padding: 24, paddingBottom: 40, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  title: { fontSize: 20, fontWeight: '700', color: colours.textPrimary },
+  subtitle: { fontSize: 14, color: colours.textSecondary, marginTop: 4, marginBottom: 16 },
+  label: { fontSize: 13, fontWeight: '600', color: colours.textSecondary, marginTop: 12, marginBottom: 6 },
+  input: { backgroundColor: colours.offWhite, borderWidth: 1, borderColor: colours.border, borderRadius: 8, padding: 10, fontSize: 15, color: colours.textPrimary },
+  saveBtn: { backgroundColor: colours.gold, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveText: { fontSize: 15, fontWeight: '700', color: colours.charcoalDark },
+  cancelBtn: { alignItems: 'center', padding: 14, marginTop: 4 },
+  cancelText: { fontSize: 14, color: colours.textMuted },
 });

@@ -158,16 +158,28 @@ export default function DinerHome() {
                   <Text style={styles.cuisineType}>{item.restaurant?.cuisine_type}</Text>
                   <Text style={styles.address} numberOfLines={1}>{item.restaurant?.address}</Text>
                 </View>
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateDay}>{new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric' })}</Text>
-                  <Text style={styles.dateMonth}>{new Date(item.date).toLocaleDateString('en-GB', { month: 'short' })}</Text>
-                </View>
+                {(() => {
+                  const headerDate = item.voucher_expiry ?? item.date;
+                  if (!headerDate) return null;
+                  return (
+                    <View style={styles.dateBox}>
+                      <Text style={styles.dateDay}>{new Date(headerDate).toLocaleDateString('en-GB', { day: 'numeric' })}</Text>
+                      <Text style={styles.dateMonth}>{new Date(headerDate).toLocaleDateString('en-GB', { month: 'short' })}</Text>
+                    </View>
+                  );
+                })()}
               </View>
 
               <View style={styles.cardMid}>
-                <View style={styles.pill}>
-                  <Text style={styles.pillText}>🕐 {item.time.slice(0, 5)}</Text>
-                </View>
+                {item.voucher_expiry ? (
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>🎟 Expires {new Date(item.voucher_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
+                  </View>
+                ) : item.time ? (
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>🕐 {item.time.slice(0, 5)}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.pill}>
                   <Text style={styles.pillText}>👥 Up to {item.max_covers} guests</Text>
                 </View>
