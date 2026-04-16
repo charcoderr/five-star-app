@@ -29,6 +29,9 @@ function AuthGuard() {
         registerPushToken(session.user.id).catch(() => {});
       }
       setLoading(false);
+    }).catch(() => {
+      // Network failure — clear loading so user reaches login screen
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -95,7 +98,7 @@ async function routeByRole(user: AppUser) {
       .eq('diner_id', user.id)
       .order('signed_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!tcs) {
       router.replace('/(auth)/terms');
