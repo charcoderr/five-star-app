@@ -77,7 +77,7 @@ export default function AdminRestaurants() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Venues</Text>
+          <Text style={styles.headerTitle}>Restaurants</Text>
           <Text style={styles.headerSub}>
             {filtered.length} of {restaurants?.length ?? 0} shown
           </Text>
