@@ -61,7 +61,7 @@ export function useReportDetail(reportId: string) {
             *,
             diner:users!reports_diner_id_fkey(name, email, phone),
             restaurant:restaurants(id, name, address),
-            assignment:assignments(slot:slots(date, time))
+            assignment:assignments(booking_date, booking_time, slot:slots(date, time))
           `)
           .eq('id', reportId)
           .single(),

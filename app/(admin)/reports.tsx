@@ -31,7 +31,7 @@ export default function AdminReports() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Reports</Text>
-        <Text style={styles.headerSub}>{reports?.filter(r => r.status === 'submitted').length ?? 0} awaiting review</Text>
+        <Text style={styles.headerSub}>{reports?.filter(r => r.status === 'submitted' || r.status === 'under_review').length ?? 0} to review</Text>
       </View>
 
       <FlatList

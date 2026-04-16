@@ -127,9 +127,9 @@ export default function AdminDashboard() {
       <Text style={styles.sectionTitle}>Overview</Text>
       <View style={styles.statsGrid}>
         <StatCard value={stats?.openSlots ?? 0} label="Available Dines" onPress={() => router.push('/(admin)/slots')} />
-        <StatCard value={stats?.pendingReports ?? 0} label="Reports to Review" accent={(stats?.pendingReports ?? 0) > 0} onPress={() => router.push('/(admin)/reports')} />
+        <StatCard value={(stats?.pendingReports ?? 0) + (stats?.reportsUnderReview ?? 0)} label="Reports to Review" accent={((stats?.pendingReports ?? 0) + (stats?.reportsUnderReview ?? 0)) > 0} onPress={() => router.push('/(admin)/reports')} />
         <StatCard value={stats?.activeDiners ?? 0} label="Active Diners" onPress={() => router.push('/(admin)/diners')} />
-        <StatCard value={stats?.restaurants ?? 0} label="Restaurants" onPress={() => router.push('/(admin)/restaurants')} />
+        <StatCard value={stats?.restaurants ?? 0} label="Venues" onPress={() => router.push('/(admin)/restaurants')} />
       </View>
 
       {/* Quick actions */}

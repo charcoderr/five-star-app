@@ -70,12 +70,12 @@ export default function AdminReportDetail() {
 
   function handleReview() {
     Alert.alert(
-      'Mark as Reviewed?',
-      'This will calculate the star rating for this restaurant.',
+      'Approve & Send to Restaurant?',
+      'This will calculate the star rating and share the report with the restaurant.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Mark Reviewed',
+          text: 'Approve & Send',
           onPress: async () => {
             await reviewReport.mutateAsync({
               reportId: report.id,
@@ -83,7 +83,7 @@ export default function AdminReportDetail() {
               answers: report.answers,
               adminNotes,
             });
-            Alert.alert('Done', 'Report reviewed and star rating updated.', [
+            Alert.alert('Sent!', 'Report approved and shared with the restaurant.', [
               { text: 'OK', onPress: () => router.back() },
             ]);
           },
@@ -107,9 +107,9 @@ export default function AdminReportDetail() {
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>{report.restaurant?.name}</Text>
           <Text style={styles.headerSub}>
-            {report.diner?.name} · {report.assignment?.slot?.date
-              ? new Date(report.assignment.slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-              : '—'}
+            {report.diner?.name} · {(report.assignment?.booking_date ?? report.assignment?.slot?.date)
+              ? new Date(report.assignment.booking_date ?? report.assignment.slot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+              : report.submitted_at ? new Date(report.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
           </Text>
         </View>
       </View>
@@ -185,9 +185,9 @@ export default function AdminReportDetail() {
           <Text style={styles.detailRow}>Email: <Text style={styles.detailValue}>{report.diner?.email}</Text></Text>
           <Text style={styles.detailRow}>Phone: <Text style={styles.detailValue}>{report.diner?.phone ?? '—'}</Text></Text>
           <Text style={styles.detailRow}>Visit: <Text style={styles.detailValue}>
-            {report.assignment?.slot?.date
-              ? new Date(report.assignment.slot.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-              : '—'} at {report.assignment?.slot?.time?.slice(0, 5) ?? '—'}
+            {(report.assignment?.booking_date ?? report.assignment?.slot?.date)
+              ? new Date(report.assignment.booking_date ?? report.assignment.slot.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+              : '—'}{(report.assignment?.booking_time ?? report.assignment?.slot?.time) ? ` at ${(report.assignment.booking_time ?? report.assignment.slot.time).slice(0, 5)}` : ''}
           </Text></Text>
         </View>
 
@@ -295,7 +295,7 @@ export default function AdminReportDetail() {
         )}
 
         {/* Review button */}
-        {report.status === 'submitted' && (
+        {(report.status === 'submitted' || report.status === 'under_review') && (
           <TouchableOpacity
             style={styles.reviewBtn}
             onPress={handleReview}

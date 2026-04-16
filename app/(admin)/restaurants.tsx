@@ -77,7 +77,7 @@ export default function AdminRestaurants() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Restaurants</Text>
+          <Text style={styles.headerTitle}>Venues</Text>
           <Text style={styles.headerSub}>
             {filtered.length} of {restaurants?.length ?? 0} shown
           </Text>
@@ -174,7 +174,7 @@ export default function AdminRestaurants() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 13, color: colours.textSecondary, marginTop: 2 },
   addBtn: { backgroundColor: colours.gold, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
