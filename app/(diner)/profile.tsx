@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { colours } from '../../utils/theme';
@@ -112,7 +113,7 @@ export default function DinerProfile() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.signOut} onPress={() => supabase.auth.signOut()}>
+      <TouchableOpacity style={styles.signOut} onPress={async () => { await supabase.auth.signOut(); router.replace('/(auth)/login'); }}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 

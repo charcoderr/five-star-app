@@ -81,7 +81,10 @@ export default function AdminDashboard() {
           </View>
           <TouchableOpacity
             style={styles.signOutBtn}
-            onPress={() => supabase.auth.signOut()}
+            onPress={async () => {
+              await supabase.auth.signOut();
+              router.replace('/(auth)/login');
+            }}
             hitSlop={12}
           >
             <Ionicons name="log-out-outline" size={22} color={colours.charcoalLight} />

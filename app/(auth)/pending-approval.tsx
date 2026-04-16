@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { colours } from '../../utils/theme';
 
@@ -12,7 +13,7 @@ export default function PendingApprovalScreen() {
         Thank you for applying to become a 5StarX Mystery Diner.{'\n\n'}
         Wendy is reviewing your application and will be in touch shortly. You'll receive an email once your account has been approved.
       </Text>
-      <TouchableOpacity style={styles.signOut} onPress={() => supabase.auth.signOut()}>
+      <TouchableOpacity style={styles.signOut} onPress={async () => { await supabase.auth.signOut(); router.replace('/(auth)/login'); }}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>

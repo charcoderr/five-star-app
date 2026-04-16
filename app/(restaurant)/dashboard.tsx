@@ -108,7 +108,7 @@ export default function RestaurantDashboard() {
           <Text style={styles.greeting}>Welcome back</Text>
           <Text style={styles.name}>{stats?.restaurantName || user?.name}</Text>
         </View>
-        <TouchableOpacity onPress={() => supabase.auth.signOut()}>
+        <TouchableOpacity onPress={async () => { await supabase.auth.signOut(); router.replace('/(auth)/login'); }}>
           <Text style={styles.signOut}>Sign out</Text>
         </TouchableOpacity>
       </View>
