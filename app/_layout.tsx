@@ -16,6 +16,10 @@ function AuthGuard() {
   useNotificationListeners();
 
   useEffect(() => {
+    // Hard fallback — if Supabase hangs for any reason, clear loading after 6s
+    // so the user reaches the login screen instead of being stuck on the splash.
+    const fallback = setTimeout(() => setLoading(false), 6000);
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
@@ -25,13 +29,13 @@ function AuthGuard() {
           .eq('id', session.user.id)
           .single();
         setUser(data as AppUser);
-        // Register push token for this device
         registerPushToken(session.user.id).catch(() => {});
       }
       setLoading(false);
     }).catch(() => {
-      // Network failure — clear loading so user reaches login screen
       setLoading(false);
+    }).finally(() => {
+      clearTimeout(fallback);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
