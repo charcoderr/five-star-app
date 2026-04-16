@@ -8,18 +8,18 @@
 -- Apply with:
 --   supabase db query --linked --file supabase/seeds/la_vita_slot.sql
 
-insert into public.slots (id, restaurant_id, date, time, max_covers, status, created_by)
+insert into public.slots (id, restaurant_id, voucher_expiry, notes, max_covers, status, created_by)
 select
   'bbbbbbbb-1111-4000-8000-000000000001',
   'aaaaaaaa-1111-4000-8000-000000000001',
-  (current_date + interval '1 day')::date,
-  '19:00',
+  (current_date + interval '60 days')::date,
+  'Dinner for up to 2 guests. Book directly with the restaurant at a time that suits you.',
   2,
   'open',
   (select id from public.users where role = 'admin' limit 1)
 on conflict (id) do update set
-  date = excluded.date,
-  time = excluded.time,
+  voucher_expiry = excluded.voucher_expiry,
+  notes = excluded.notes,
   status = 'open';
 
 -- Verify

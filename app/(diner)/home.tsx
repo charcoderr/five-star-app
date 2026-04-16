@@ -1,7 +1,9 @@
 import {
   View, Text, StyleSheet, SectionList, TouchableOpacity,
-  Alert, RefreshControl,
+  Alert, RefreshControl, TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState, useMemo } from 'react';
 import { colours } from '../../utils/theme';
 import { useOpenSlots, useClaimedSlots } from '../../hooks/useSlots';
 import { useAuthStore } from '../../stores/authStore';
@@ -22,6 +24,7 @@ function StarRating({ rating }: { rating: number | null }) {
 
 export default function DinerHome() {
   const { user } = useAuthStore();
+  const [search, setSearch] = useState('');
   const { data: openSlots, isLoading: loadingOpen, refetch: refetchOpen, isRefetching: refetchingOpen } = useOpenSlots();
   const { data: claimedSlots, isLoading: loadingClaimed, refetch: refetchClaimed, isRefetching: refetchingClaimed } = useClaimedSlots();
   const { data: waitlistMap } = useMyWaitlistEntries(user?.id);
@@ -31,6 +34,26 @@ export default function DinerHome() {
 
   const isLoading = loadingOpen || loadingClaimed;
   const isRefetching = refetchingOpen || refetchingClaimed;
+
+  const filteredOpen = useMemo(() => {
+    if (!search.trim()) return openSlots ?? [];
+    const q = search.trim().toLowerCase();
+    return (openSlots ?? []).filter(s =>
+      s.restaurant?.name?.toLowerCase().includes(q) ||
+      s.restaurant?.address?.toLowerCase().includes(q) ||
+      s.restaurant?.cuisine_type?.toLowerCase().includes(q)
+    );
+  }, [openSlots, search]);
+
+  const filteredClaimed = useMemo(() => {
+    if (!search.trim()) return claimedSlots ?? [];
+    const q = search.trim().toLowerCase();
+    return (claimedSlots ?? []).filter(s =>
+      s.restaurant?.name?.toLowerCase().includes(q) ||
+      s.restaurant?.address?.toLowerCase().includes(q) ||
+      s.restaurant?.cuisine_type?.toLowerCase().includes(q)
+    );
+  }, [claimedSlots, search]);
 
   function handleRefetch() {
     refetchOpen();
@@ -111,14 +134,26 @@ export default function DinerHome() {
     );
   }
 
-  const hasOpen = (openSlots?.length ?? 0) > 0;
-  const hasClaimed = (claimedSlots?.length ?? 0) > 0;
+  const hasOpen = filteredOpen.length > 0;
+  const hasClaimed = filteredClaimed.length > 0;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Available Dines</Text>
         <Text style={styles.headerSub}>Apply for a voucher — you choose when to dine</Text>
+      </View>
+
+      <View style={styles.searchBar}>
+        <Ionicons name="location-outline" size={16} color={colours.textMuted} style={{ marginRight: 6 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by city, restaurant or cuisine..."
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor={colours.textMuted}
+          clearButtonMode="while-editing"
+        />
       </View>
 
       <SectionList
@@ -128,15 +163,15 @@ export default function DinerHome() {
           <RefreshControl refreshing={isRefetching} onRefresh={handleRefetch} tintColor={colours.gold} />
         }
         sections={[
-          ...(hasOpen ? [{ title: 'OPEN', data: openSlots ?? [] }] : []),
-          ...(hasClaimed ? [{ title: 'WAITLIST AVAILABLE', data: claimedSlots ?? [] }] : []),
+          ...(hasOpen ? [{ title: 'OPEN', data: filteredOpen }] : []),
+          ...(hasClaimed ? [{ title: 'WAITLIST AVAILABLE', data: filteredClaimed }] : []),
         ]}
         keyExtractor={item => item.id}
         ListEmptyComponent={
           <EmptyState
             icon="restaurant-outline"
-            title="No dines available right now"
-            subtitle="Check back soon — Wendy posts new slots each month."
+            title={search.trim() ? 'No dines found' : 'No dines available right now'}
+            subtitle={search.trim() ? `No results for "${search}" — try a different city or cuisine.` : 'Check back soon — Wendy posts new dines each month.'}
           />
         }
         renderSectionHeader={({ section }) =>
@@ -227,6 +262,8 @@ const styles = StyleSheet.create({
   header: { paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colours.textPrimary },
   headerSub: { fontSize: 14, color: colours.textSecondary, marginTop: 2 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border },
+  searchInput: { flex: 1, fontSize: 14, color: colours.textPrimary },
   list: { padding: 16, paddingTop: 8, gap: 0 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   sectionHeader: { paddingTop: 16, paddingBottom: 8, paddingHorizontal: 4 },
