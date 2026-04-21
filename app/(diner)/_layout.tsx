@@ -68,12 +68,7 @@ export default function DinerLayout() {
         name="home"
         options={{
           title: 'Available',
-          headerShown: true,
-          headerStyle: { backgroundColor: colours.charcoalDark },
-          headerTintColor: colours.white,
-          headerTitle: '5StarX',
-          headerTitleStyle: { fontWeight: '800', fontSize: 20, color: colours.gold, letterSpacing: 0.5 },
-          headerRight: () => <BellIcon userId={user?.id} />,
+          headerShown: false,
           tabBarIcon: tabIcon('restaurant-outline'),
         }}
       />

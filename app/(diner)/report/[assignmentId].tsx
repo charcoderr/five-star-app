@@ -397,15 +397,15 @@ export default function ReportScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header — two rows: back + saving, then restaurant name */}
+      {/* Header — back button inline with restaurant name */}
       <View style={styles.header}>
-        <View style={styles.headerTopRow}>
+        <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>←</Text>
           </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{restaurantName}</Text>
           {saveDraft.isPending && <Text style={styles.saving}>Saving…</Text>}
         </View>
-        <Text style={styles.headerTitle}>{restaurantName}</Text>
       </View>
 
       {/* Sticky running-timer bars — stacks all running timers between header and scroll */}
@@ -625,10 +625,10 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 15, color: colours.textSecondary },
   errorText: { fontSize: 15, color: colours.error },
   header: { paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.charcoalDark },
-  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  backBtn: {},
-  backText: { color: colours.gold, fontSize: 15, fontWeight: '600' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: colours.white },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: colours.gold, alignItems: 'center', justifyContent: 'center' },
+  backText: { color: colours.gold, fontSize: 16, fontWeight: '700' },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: colours.white, flex: 1 },
   saving: { fontSize: 12, color: colours.charcoalLight, fontStyle: 'italic' },
   stickyTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold, paddingHorizontal: 16, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: colours.goldDark + '44' },
   stickyTimerLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
