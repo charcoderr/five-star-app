@@ -11,7 +11,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -24,17 +24,19 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Used to take photos as evidence for your mystery dine report.",
         "NSPhotoLibraryUsageDescription": "Used to attach photos to your mystery dine report.",
-        "NSUserNotificationsUsageDescription": "We'll send you booking reminders and updates about your mystery dine assignments."
+        "NSUserNotificationsUsageDescription": "We'll send you booking reminders and updates about your mystery dine assignments.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.fivestarx.app",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
