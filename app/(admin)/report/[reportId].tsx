@@ -124,7 +124,9 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[], lo
         const order = question?.order ?? '';
 
         let answerHtml = '';
-        if (answer.score !== undefined) {
+        if (answer.score === -1) {
+          answerHtml = `<div style="margin-bottom:4px;"><span style="display:inline-block;background:#99999918;color:#999;border:1.5px solid #999;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;">Not Applicable</span></div>`;
+        } else if (answer.score !== undefined) {
           const c = scorePalette[answer.score] ?? '#999';
           answerHtml = `<div style="margin-bottom:4px;"><span style="display:inline-block;background:${c}18;color:${c};border:1.5px solid ${c};border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;">${answer.score} \u00b7 ${scoreLabels[answer.score] ?? '\u2014'}</span></div>`;
         }
@@ -139,10 +141,10 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[], lo
           answerHtml += `<div style="font-size:12px;color:#555;margin-top:6px;padding:6px 12px;background:#C9A84C0D;border-left:3px solid #C9A84C;border-radius:4px;line-height:1.4;"><strong>Note:</strong> ${answer.notes}</div>`;
         }
 
-        // Per-question photo
-        const photoUrl = answer.photo_url;
-        if (photoUrl) {
-          answerHtml += `<div style="margin-top:8px;"><img src="${photoUrl}" style="width:100%;max-width:400px;border-radius:8px;border:1px solid #e0e0e0;" /></div>`;
+        // Per-question photos (supports multiple)
+        const photoUrls = answer.photo_urls ?? (answer.photo_url ? [answer.photo_url] : []);
+        for (const pUrl of photoUrls) {
+          answerHtml += `<div style="margin-top:8px;"><img src="${pUrl}" style="width:100%;max-width:400px;border-radius:8px;border:1px solid #e0e0e0;" /></div>`;
         }
 
         return `<tr>
@@ -329,14 +331,18 @@ export default function AdminReportDetail() {
       // Refresh signed URLs for per-question photos (they expire)
       const freshAnswers = { ...report.answers };
       for (const [qId, ans] of Object.entries(freshAnswers) as [string, any][]) {
-        // Use photo_storage_path (reliable) to generate a fresh signed URL
-        const storagePath = ans?.photo_storage_path;
-        if (storagePath) {
-          const { data: urlData } = await supabase.storage
-            .from('report-photos')
-            .createSignedUrl(storagePath, 3600);
-          if (urlData?.signedUrl) {
-            freshAnswers[qId] = { ...ans, photo_url: urlData.signedUrl };
+        // Refresh signed URLs from storage paths (handles both single and array)
+        const paths = ans?.photo_storage_paths ?? (ans?.photo_storage_path ? [ans.photo_storage_path] : []);
+        if (paths.length > 0) {
+          const freshUrls: string[] = [];
+          for (const p of paths) {
+            const { data: urlData } = await supabase.storage
+              .from('report-photos')
+              .createSignedUrl(p, 3600);
+            if (urlData?.signedUrl) freshUrls.push(urlData.signedUrl);
+          }
+          if (freshUrls.length > 0) {
+            freshAnswers[qId] = { ...ans, photo_url: freshUrls[0], photo_urls: freshUrls };
           }
         }
       }
