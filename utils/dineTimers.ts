@@ -110,7 +110,30 @@ export function parseMMSS(input: string): number | null {
 }
 
 // ─── Timer state ──────────────────────────────────────────────────────────────
-export type TimerStatus = 'idle' | 'running' | 'stopped' | 'cancelled' | 'manual';
+export type TimerStatus = 'idle' | 'running' | 'stopped' | 'cancelled' | 'manual' | 'skipped';
+
+// ─── Phase grouping ──────────────────────────────────────────────────────────
+export interface TimerPhase {
+  label: string;
+  timerIds: string[];
+}
+
+export const TIMER_PHASES: TimerPhase[] = [
+  { label: 'Arrival',   timerIds: ['drinks_order', 'drinks_arrived'] },
+  { label: 'Ordering',  timerIds: ['food_order'] },
+  { label: 'Courses',   timerIds: ['starters_arrived', 'mains_arrived', 'desserts_arrived'] },
+  { label: 'Departure', timerIds: ['bill_arrived'] },
+];
+
+// Map each timer to its "next" timer for auto-chain nudge
+export const NEXT_TIMER: Record<string, string> = {
+  drinks_order: 'drinks_arrived',
+  drinks_arrived: 'food_order',
+  food_order: 'starters_arrived',
+  starters_arrived: 'mains_arrived',
+  mains_arrived: 'desserts_arrived',
+  desserts_arrived: 'bill_arrived',
+};
 
 export interface TimerState {
   id: string;

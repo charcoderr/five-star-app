@@ -359,9 +359,11 @@ export default function ReportScreen() {
           liveElapsed={dineTimers.liveElapsed}
           onStart={dineTimers.startTimer}
           onStop={dineTimers.stopTimer}
+          onSkip={dineTimers.skipTimer}
           onManual={dineTimers.setManualTime}
           onReset={dineTimers.resetTimer}
           onNotes={dineTimers.setTimerNotes}
+          nudgeTimerId={dineTimers.nudgeTimerId}
         />
 
         {allCategories.map(category => {

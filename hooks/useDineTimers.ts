@@ -5,13 +5,15 @@ import {
   TimerState,
   buildInitialTimers,
   scoreFromElapsed,
+  NEXT_TIMER,
 } from '../utils/dineTimers';
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useDineTimers() {
   const [timers, setTimers] = useState<Record<string, TimerState>>(buildInitialTimers);
-  // Tracks the live elapsed seconds for running timers (display only)
   const [liveElapsed, setLiveElapsed] = useState<Record<string, number>>({});
+  // ID of the timer that was most recently stopped — used for auto-chain nudge
+  const [lastStoppedId, setLastStoppedId] = useState<string | null>(null);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCancelRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -96,6 +98,30 @@ export function useDineTimers() {
       delete next[id];
       return next;
     });
+
+    // Auto-chain nudge: highlight the next timer for 3 seconds
+    const nextId = NEXT_TIMER[id];
+    if (nextId) {
+      setLastStoppedId(id);
+      setTimeout(() => setLastStoppedId(prev => prev === id ? null : prev), 3000);
+    }
+  }, []);
+
+  // ── Skip (N/A — diner didn't use this, e.g. no desserts) ────────────────
+  const skipTimer = useCallback((id: string) => {
+    if (autoCancelRefs.current[id]) {
+      clearTimeout(autoCancelRefs.current[id]);
+      delete autoCancelRefs.current[id];
+    }
+    setTimers(prev => ({
+      ...prev,
+      [id]: { ...prev[id], status: 'skipped', elapsedSeconds: null, suggestedScore: null },
+    }));
+    setLiveElapsed(le => {
+      const next = { ...le };
+      delete next[id];
+      return next;
+    });
   }, []);
 
   // ── Manual override (user typed a time) ──────────────────────────────────
@@ -145,13 +171,18 @@ export function useDineTimers() {
     }));
   }, []);
 
+  // The "next" timer to nudge after the last stopped one
+  const nudgeTimerId = lastStoppedId ? NEXT_TIMER[lastStoppedId] ?? null : null;
+
   return {
     timers,
     liveElapsed,
     startTimer,
     stopTimer,
+    skipTimer,
     setManualTime,
     resetTimer,
     setTimerNotes,
+    nudgeTimerId,
   };
 }

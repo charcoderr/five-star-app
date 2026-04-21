@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, Animated,
 } from 'react-native';
 import { colours } from '../utils/theme';
 import {
   DINE_TIMERS,
   TimerState,
+  TimerDefinition,
+  TIMER_PHASES,
   formatSeconds,
   parseMMSS,
 } from '../utils/dineTimers';
@@ -19,21 +21,39 @@ interface Props {
   liveElapsed: Record<string, number>;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
+  onSkip: (id: string) => void;
   onManual: (id: string, seconds: number) => void;
   onReset: (id: string) => void;
   onNotes: (id: string, text: string) => void;
+  nudgeTimerId: string | null;
+}
+
+// ─── Running colour based on thresholds ───────────────────────────────────────
+function runningColour(elapsed: number, def: TimerDefinition): string {
+  const [excellent, good, fair] = def.scoreThresholds;
+  if (elapsed <= excellent) return colours.scoreGood;      // green — Excellent zone
+  if (elapsed <= good)      return colours.scoreFair;      // amber — Good zone
+  if (elapsed <= fair)      return colours.scorePoor + 'CC'; // orange-red — Fair zone
+  return colours.scorePoor;                                 // red — Poor zone
+}
+
+// ─── Threshold label ──────────────────────────────────────────────────────────
+function thresholdLabel(def: TimerDefinition): string {
+  return `Under ${formatSeconds(def.scoreThresholds[0])} = Excellent`;
 }
 
 // ─── Individual timer row ─────────────────────────────────────────────────────
-function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset, onNotes }: {
-  def: typeof DINE_TIMERS[number];
+function TimerRow({ def, state, liveSeconds, onStart, onStop, onSkip, onManual, onReset, onNotes, isNudged }: {
+  def: TimerDefinition;
   state: TimerState;
   liveSeconds?: number;
   onStart: () => void;
   onStop: () => void;
+  onSkip: () => void;
   onManual: (seconds: number) => void;
   onReset: () => void;
   onNotes: (text: string) => void;
+  isNudged: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -41,11 +61,17 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
   const isRunning  = state.status === 'running';
   const isStopped  = state.status === 'stopped' || state.status === 'manual';
   const isCancelled = state.status === 'cancelled';
+  const isSkipped  = state.status === 'skipped';
   const isIdle     = state.status === 'idle';
 
   const displaySeconds = isRunning
     ? (liveSeconds ?? 0)
     : (state.elapsedSeconds ?? 0);
+
+  // Colour shifts green → amber → red as thresholds pass
+  const timeColour = isRunning
+    ? runningColour(liveSeconds ?? 0, def)
+    : colours.charcoalDark;
 
   function commitEdit() {
     const parsed = parseMMSS(editText);
@@ -57,11 +83,14 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
   }
 
   return (
-    <View style={rowStyles.container}>
-      {/* Label + target */}
+    <View style={[
+      rowStyles.container,
+      isNudged && rowStyles.nudged,
+    ]}>
+      {/* Label + threshold hint */}
       <View style={rowStyles.labelBlock}>
         <Text style={rowStyles.label}>{def.label}</Text>
-        <Text style={rowStyles.target}>Target: {formatSeconds(def.targetSeconds)}</Text>
+        <Text style={rowStyles.target}>{thresholdLabel(def)}</Text>
       </View>
 
       {/* Display + controls */}
@@ -87,23 +116,27 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
                 setEditing(true);
               }
             }}
-            disabled={isRunning || isIdle}
+            disabled={isRunning || isIdle || isSkipped}
           >
             <Text style={[
               rowStyles.time,
-              isRunning && rowStyles.timeRunning,
+              isRunning && { color: timeColour },
               isCancelled && rowStyles.timeCancelled,
+              isSkipped && rowStyles.timeSkipped,
             ]}>
-              {isCancelled
-                ? 'Cancelled'
-                : isIdle
-                  ? '--:--'
-                  : formatSeconds(displaySeconds)
+              {isSkipped
+                ? 'Skipped'
+                : isCancelled
+                  ? 'Cancelled'
+                  : isIdle
+                    ? '--:--'
+                    : formatSeconds(displaySeconds)
               }
             </Text>
           </TouchableOpacity>
         )}
 
+        {/* Score badge */}
         {(isStopped) && state.suggestedScore !== null && (
           <View style={[rowStyles.scoreBadge, { backgroundColor: SCORE_COLOURS[state.suggestedScore] + '22', borderColor: SCORE_COLOURS[state.suggestedScore] }]}>
             <Text style={[rowStyles.scoreText, { color: SCORE_COLOURS[state.suggestedScore] }]}>
@@ -112,10 +145,16 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
           </View>
         )}
 
+        {/* Action buttons */}
         {isIdle && (
-          <TouchableOpacity style={rowStyles.startBtn} onPress={onStart}>
-            <Text style={rowStyles.startBtnText}>Start</Text>
-          </TouchableOpacity>
+          <View style={rowStyles.actions}>
+            <TouchableOpacity style={rowStyles.startBtn} onPress={onStart}>
+              <Text style={rowStyles.startBtnText}>Start</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onSkip}>
+              <Text style={rowStyles.skipText}>Skip</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {isRunning && (
@@ -124,7 +163,7 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
           </TouchableOpacity>
         )}
 
-        {(isStopped || isCancelled) && (
+        {(isStopped || isCancelled || isSkipped) && (
           <TouchableOpacity style={rowStyles.resetBtn} onPress={onReset}>
             <Text style={rowStyles.resetBtnText}>↺</Text>
           </TouchableOpacity>
@@ -137,6 +176,11 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
       )}
       {isCancelled && !editing && (
         <Text style={rowStyles.editHint}>Tap 'Cancelled' to enter time manually</Text>
+      )}
+
+      {/* Nudge hint */}
+      {isNudged && isIdle && (
+        <Text style={rowStyles.nudgeHint}>Up next — tap Start when ready</Text>
       )}
 
       {/* Notes field — visible when timer has been used */}
@@ -157,8 +201,11 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset,
 // ─── Panel ────────────────────────────────────────────────────────────────────
 export default function DineTimerPanel({
   timers, liveElapsed,
-  onStart, onStop, onManual, onReset, onNotes,
+  onStart, onStop, onSkip, onManual, onReset, onNotes,
+  nudgeTimerId,
 }: Props) {
+  const timerMap = Object.fromEntries(DINE_TIMERS.map(d => [d.id, d]));
+
   return (
     <View style={styles.panel}>
       <View style={styles.headerRow}>
@@ -166,25 +213,32 @@ export default function DineTimerPanel({
         <Text style={styles.panelSub}>Track service times as you dine</Text>
       </View>
 
-      <View style={styles.timersContainer}>
-        <Text style={styles.hint}>
-          Start each timer when the event begins, stop when it happens.
-          Timers auto-cancel if left running too long. You can edit any time after stopping.
-        </Text>
-        {DINE_TIMERS.map(def => (
-          <TimerRow
-            key={def.id}
-            def={def}
-            state={timers[def.id]}
-            liveSeconds={liveElapsed[def.id]}
-            onStart={() => onStart(def.id)}
-            onStop={() => onStop(def.id)}
-            onManual={secs => onManual(def.id, secs)}
-            onReset={() => onReset(def.id)}
-            onNotes={text => onNotes(def.id, text)}
-          />
-        ))}
-      </View>
+      {TIMER_PHASES.map(phase => (
+        <View key={phase.label}>
+          <View style={styles.phaseHeader}>
+            <Text style={styles.phaseLabel}>{phase.label}</Text>
+          </View>
+          {phase.timerIds.map(id => {
+            const def = timerMap[id];
+            if (!def) return null;
+            return (
+              <TimerRow
+                key={def.id}
+                def={def}
+                state={timers[def.id]}
+                liveSeconds={liveElapsed[def.id]}
+                onStart={() => onStart(def.id)}
+                onStop={() => onStop(def.id)}
+                onSkip={() => onSkip(def.id)}
+                onManual={secs => onManual(def.id, secs)}
+                onReset={() => onReset(def.id)}
+                onNotes={text => onNotes(def.id, text)}
+                isNudged={nudgeTimerId === def.id}
+              />
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -209,14 +263,19 @@ const styles = StyleSheet.create({
   },
   panelTitle: { fontSize: 14, fontWeight: '700', color: colours.gold, textTransform: 'uppercase', letterSpacing: 0.8 },
   panelSub: { fontSize: 12, color: colours.charcoalLight, marginTop: 2 },
-  timersContainer: { paddingBottom: 8 },
-  hint: {
-    fontSize: 12,
-    color: colours.textMuted,
-    lineHeight: 17,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+  phaseHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colours.offWhite,
+    borderBottomWidth: 1,
+    borderBottomColor: colours.border,
+  },
+  phaseLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colours.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
 });
 
@@ -227,13 +286,19 @@ const rowStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colours.border,
   },
+  nudged: {
+    backgroundColor: colours.gold + '0D',
+    borderLeftWidth: 3,
+    borderLeftColor: colours.gold,
+  },
   labelBlock: { marginBottom: 8 },
   label: { fontSize: 14, fontWeight: '600', color: colours.textPrimary },
   target: { fontSize: 11, color: colours.textMuted, marginTop: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   time: { fontSize: 22, fontWeight: '700', color: colours.charcoalDark, minWidth: 70 },
-  timeRunning: { color: colours.gold },
   timeCancelled: { fontSize: 14, color: colours.textMuted, fontWeight: '500' },
+  timeSkipped: { fontSize: 14, color: colours.textMuted, fontWeight: '500', fontStyle: 'italic' },
   editInput: {
     fontSize: 20,
     fontWeight: '700',
@@ -257,6 +322,7 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 7,
   },
   startBtnText: { fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
+  skipText: { fontSize: 12, color: colours.textMuted, fontWeight: '600' },
   stopBtn: {
     backgroundColor: colours.charcoalDark,
     borderRadius: 8,
@@ -275,6 +341,7 @@ const rowStyles = StyleSheet.create({
   },
   resetBtnText: { fontSize: 18, color: colours.textSecondary },
   editHint: { fontSize: 11, color: colours.textMuted, marginTop: 4 },
+  nudgeHint: { fontSize: 11, color: colours.gold, fontWeight: '600', marginTop: 4 },
   notesInput: {
     marginTop: 8,
     padding: 10,
