@@ -7,13 +7,18 @@ export function useOpenSlots() {
   return useQuery({
     queryKey: ['slots', 'open'],
     queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('slots')
         .select('*, restaurant:restaurants(id, name, address, cuisine_type, avg_rating)')
         .eq('status', 'open')
-        .order('date', { ascending: true });
+        .or(`voucher_expiry.gte.${today},voucher_expiry.is.null`)
+        .order('voucher_expiry', { ascending: true, nullsFirst: false });
       if (error) throw error;
-      return data as (Slot & { restaurant: any })[];
+      // Also filter out legacy date-based slots that have passed
+      return (data as (Slot & { restaurant: any })[]).filter(
+        s => !s.date || s.date >= today
+      );
     },
   });
 }
