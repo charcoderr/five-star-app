@@ -183,13 +183,13 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onSkip, onManual, 
         <Text style={rowStyles.nudgeHint}>Up next — tap Start when ready</Text>
       )}
 
-      {/* Notes field — visible when timer has been used */}
-      {(isStopped || isCancelled) && (
+      {/* Notes field — visible when timer has been used or skipped */}
+      {(isStopped || isCancelled || isSkipped) && (
         <TextInput
           style={rowStyles.notesInput}
           value={state.notes}
           onChangeText={onNotes}
-          placeholder="Add a note..."
+          placeholder={isSkipped ? "Why was this skipped?" : "Add a note..."}
           placeholderTextColor={colours.textMuted}
           multiline
         />

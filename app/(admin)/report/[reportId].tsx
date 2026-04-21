@@ -4,6 +4,8 @@ import {
   ActivityIndicator, Alert, TextInput, Image,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
 import { useReportDetail, useReviewReport } from '../../../hooks/useAdmin';
 import { useReceiptUrl } from '../../../hooks/useReceipts';
@@ -25,11 +27,149 @@ const badgeStyles = StyleSheet.create({
   label: { fontSize: 12, fontWeight: '700' },
 });
 
+// ─── PDF Export ──────────────────────────────────────────────────────────────
+function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
+  const restaurantName = report.restaurant?.name ?? 'Restaurant';
+  const dinerName = report.diner?.name ?? '—';
+  const visitDate = (report.assignment?.booking_date ?? report.assignment?.slot?.date)
+    ? new Date(report.assignment.booking_date ?? report.assignment.slot.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : '—';
+  const visitTime = (report.assignment?.booking_time ?? report.assignment?.slot?.time)?.slice(0, 5) ?? '';
+  const adminNotes = report.admin_notes ?? '';
+  const answers = report.answers ?? {};
+
+  const scorePalette = ['#D94F4F', '#F5A623', '#4CAF50', '#C9A84C'];
+  const scoreLabels = ['Poor', 'Fair', 'Good', 'Excellent'];
+
+  // Build question map for labels
+  const qMap: Record<string, any> = {};
+  for (const q of (proformaQuestions ?? [])) {
+    if (q?.id) qMap[q.id] = q;
+  }
+
+  // Group answers by category
+  const categories: Record<string, { question: any; answer: any }[]> = {};
+  for (const [qId, answer] of Object.entries(answers)) {
+    const q = qMap[qId];
+    const cat = q?.category ?? 'Other';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push({ question: q, answer: answer as any });
+  }
+  for (const cat of Object.keys(categories)) {
+    categories[cat].sort((a, b) => (a.question?.order ?? 0) - (b.question?.order ?? 0));
+  }
+
+  const categoryOrder = ['Booking', 'External', 'Internal', 'Service', 'Dining', 'Facilities', 'Wrap Up', 'Other'];
+
+  // Overall scores
+  const scored = Object.values(answers).filter((a: any) => a.score !== undefined) as any[];
+  const total = scored.reduce((s: number, a: any) => s + (a.score ?? 0), 0);
+  const max = scored.length * 3;
+  const starValue = max > 0 ? (total / max) * 5 : 0;
+  const starRounded = Math.round(starValue);
+
+  // Score breakdown
+  const breakdownRows = scoreLabels.map((label, i) => {
+    const count = scored.filter((a: any) => a.score === i).length;
+    const pct = scored.length ? Math.round((count / scored.length) * 100) : 0;
+    return `<tr>
+      <td style="padding:4px 8px;font-size:13px;color:#666;width:80px;">${label}</td>
+      <td style="padding:4px 8px;"><div style="background:#eee;border-radius:3px;height:8px;width:200px;"><div style="background:${scorePalette[i]};border-radius:3px;height:8px;width:${pct * 2}px;"></div></div></td>
+      <td style="padding:4px 8px;font-size:13px;color:#444;">${count}</td>
+    </tr>`;
+  }).join('');
+
+  // Category sections with question labels
+  const categorySections = categoryOrder
+    .filter(cat => categories[cat]?.length > 0)
+    .map(cat => {
+      const items = categories[cat];
+      const catScored = items.filter(i => i.answer?.score !== undefined);
+      const catTotal = catScored.reduce((s, i) => s + (i.answer.score ?? 0), 0);
+      const catMax = catScored.length * 3;
+
+      const rows = items.map(({ question, answer }) => {
+        const label = question?.label ?? 'Question';
+        const order = question?.order ?? '';
+        let answerHtml = '';
+        if (answer.score !== undefined) {
+          const c = scorePalette[answer.score] ?? '#999';
+          answerHtml = `<span style="background:${c}22;color:${c};border:1px solid ${c};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">${answer.score} · ${scoreLabels[answer.score] ?? '—'}</span>`;
+        }
+        if (answer.value !== undefined) {
+          const c = answer.value ? '#4CAF50' : '#D94F4F';
+          answerHtml = `<span style="background:${c}22;color:${c};border:1px solid ${c};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">${answer.value ? 'Yes' : 'No'}</span>`;
+        }
+        if (answer.text) {
+          answerHtml += `<div style="font-size:13px;color:#333;font-style:italic;margin-top:4px;line-height:1.4;">"${answer.text}"</div>`;
+        }
+        if (answer.notes) {
+          answerHtml += `<div style="font-size:12px;color:#666;font-style:italic;margin-top:2px;">Note: ${answer.notes}</div>`;
+        }
+        return `<tr>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;width:60%;">${order}. ${label}</td>
+          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${answerHtml}</td>
+        </tr>`;
+      }).join('');
+
+      return `<div style="margin-bottom:28px;">
+        <div style="display:flex;justify-content:space-between;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">
+          <span style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;">${cat}</span>
+          ${catMax > 0 ? `<span style="font-size:12px;font-weight:700;color:#C9A84C;">${catTotal} / ${catMax}</span>` : ''}
+        </div>
+        <table style="width:100%;border-collapse:collapse;">${rows}</table>
+      </div>`;
+    }).join('');
+
+  // Photo section
+  const photoSection = photos.length > 0 ? `
+    <div style="margin-bottom:28px;">
+      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">Photos (${photos.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${photos.map((p: any) => p.url ? `<img src="${p.url}" style="width:150px;height:150px;object-fit:cover;border-radius:8px;" />` : '').join('')}
+      </div>
+    </div>` : '';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; background: #fff; }
+  .header { background: #2C2C2E; color: #fff; padding: 32px 40px 24px; }
+  .brand { color: #C9A84C; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+  .restaurant { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+  .meta { font-size: 13px; color: #aaa; }
+  .content { padding: 32px 40px; }
+  .score-card { background: #2C2C2E; color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center; }
+  .stars { font-size: 36px; color: #C9A84C; margin: 8px 0 4px; }
+  .footer { background: #f8f8f6; padding: 20px 40px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; }
+</style></head>
+<body>
+  <div class="header">
+    <div class="brand">5STARX MYSTERY DINE REPORT</div>
+    <div class="restaurant">${restaurantName}</div>
+    <div class="meta">Diner: ${dinerName} &nbsp;·&nbsp; Visit: ${visitDate}${visitTime ? ' at ' + visitTime : ''} &nbsp;·&nbsp; Generated: ${new Date().toLocaleDateString('en-GB')}</div>
+  </div>
+  <div class="content">
+    <div class="score-card">
+      <div style="font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase;">Overall Rating</div>
+      <div class="stars">${max > 0 ? '\u2605'.repeat(starRounded) + '\u2606'.repeat(5 - starRounded) : '\u2014'}</div>
+      <div style="font-size:14px;color:#ddd;font-weight:600;">${max > 0 ? `${total} / ${max} pts \u00b7 ${starValue.toFixed(1)} / 5.0` : 'No scored questions'}</div>
+      ${max > 0 ? `<div style="margin-top:20px;"><table style="margin:0 auto;">${breakdownRows}</table></div>` : ''}
+    </div>
+    ${adminNotes ? `<div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">Notes from 5StarX</div><div style="background:#C9A84C18;border-left:3px solid #C9A84C;border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.5;">${adminNotes}</div></div>` : ''}
+    ${categorySections}
+    ${photoSection}
+  </div>
+  <div class="footer">Confidential \u2014 prepared by 5StarX Mystery Dines \u00b7 www.5starx.com</div>
+</body></html>`;
+}
+
 export default function AdminReportDetail() {
   const { reportId } = useLocalSearchParams<{ reportId: string }>();
   const { data, isLoading } = useReportDetail(reportId);
   const reviewReport = useReviewReport();
   const [adminNotes, setAdminNotes] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
@@ -40,6 +180,24 @@ export default function AdminReportDetail() {
   if (!report) return <View style={styles.centered}><Text>Report not found.</Text></View>;
 
   const answers = report.answers ?? {};
+
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      const html = buildReportPdf(report, proformaQuestions ?? [], photos ?? []);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('PDF saved', `Report saved to: ${uri}`);
+      }
+    } catch {
+      Alert.alert('Export failed', 'Could not generate PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // Build a lookup map: questionId → question object (with label, category, type, order)
   const questionMap: Record<string, any> = {};
@@ -114,6 +272,11 @@ export default function AdminReportDetail() {
               : report.submitted_at ? new Date(report.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
           </Text>
         </View>
+        <TouchableOpacity style={styles.pdfBtn} onPress={handleExportPdf} disabled={exporting}>
+          {exporting
+            ? <ActivityIndicator color={colours.gold} size="small" />
+            : <Text style={styles.pdfBtnText}>PDF</Text>}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -337,6 +500,8 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colours.white },
   headerSub: { fontSize: 12, color: colours.charcoalLight, marginTop: 2 },
+  pdfBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, borderColor: colours.gold, alignItems: 'center', justifyContent: 'center', minWidth: 50, marginBottom: 2 },
+  pdfBtnText: { color: colours.gold, fontWeight: '700', fontSize: 13 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16 },
   scoreSummary: { backgroundColor: colours.charcoalDark, borderRadius: 16, padding: 20, marginBottom: 16 },
