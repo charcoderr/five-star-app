@@ -330,18 +330,24 @@ export default function ReportScreen() {
         <Text style={styles.headerTitle}>{restaurantName}</Text>
       </View>
 
-      {/* Sticky running-timer bar — sits between header and scroll */}
+      {/* Sticky running-timer bars — stacks all running timers between header and scroll */}
       {(() => {
-        const runningDef = DINE_TIMERS.find(d => dineTimers.timers[d.id]?.status === 'running');
-        if (!runningDef) return null;
-        const elapsed = dineTimers.liveElapsed[runningDef.id] ?? 0;
+        const running = DINE_TIMERS.filter(d => dineTimers.timers[d.id]?.status === 'running');
+        if (running.length === 0) return null;
         return (
-          <View style={styles.stickyTimer}>
-            <Text style={styles.stickyTimerLabel}>{runningDef.shortLabel}</Text>
-            <Text style={styles.stickyTimerTime}>{formatSeconds(elapsed)}</Text>
-            <TouchableOpacity style={styles.stickyTimerStop} onPress={() => dineTimers.stopTimer(runningDef.id)}>
-              <Text style={styles.stickyTimerStopText}>Stop</Text>
-            </TouchableOpacity>
+          <View>
+            {running.map(def => {
+              const elapsed = dineTimers.liveElapsed[def.id] ?? 0;
+              return (
+                <View key={def.id} style={styles.stickyTimer}>
+                  <Text style={styles.stickyTimerLabel}>{def.shortLabel}</Text>
+                  <Text style={styles.stickyTimerTime}>{formatSeconds(elapsed)}</Text>
+                  <TouchableOpacity style={styles.stickyTimerStop} onPress={() => dineTimers.stopTimer(def.id)}>
+                    <Text style={styles.stickyTimerStopText}>Stop</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
         );
       })()}
@@ -528,7 +534,7 @@ const styles = StyleSheet.create({
   backText: { color: colours.gold, fontSize: 15, fontWeight: '600' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: colours.white },
   saving: { fontSize: 12, color: colours.charcoalLight, fontStyle: 'italic' },
-  stickyTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold, paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
+  stickyTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold, paddingHorizontal: 16, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: colours.goldDark + '44' },
   stickyTimerLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
   stickyTimerTime: { fontSize: 18, fontWeight: '800', color: colours.charcoalDark, fontVariant: ['tabular-nums'] },
   stickyTimerStop: { backgroundColor: colours.charcoalDark, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
