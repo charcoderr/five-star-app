@@ -115,7 +115,7 @@ function QuestionPhoto({
       <View style={photoStyles.prominentWrap}>
         {allPhotos.length > 0 ? (
           <View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8, overflow: 'visible', paddingTop: 8, paddingLeft: 4 }}>
               <View style={photoStyles.row}>
                 {allPhotos.map((uri, i) => (
                   <View key={i} style={photoStyles.thumbWrap}>
@@ -182,7 +182,7 @@ function QuestionPhoto({
 }
 
 const photoStyles = StyleSheet.create({
-  prominentWrap: { marginTop: 10 },
+  prominentWrap: { marginTop: 10, paddingTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   thumb: { width: 80, height: 80, borderRadius: 8, backgroundColor: colours.border },
   replaceBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1.5, borderColor: colours.gold },
@@ -195,12 +195,12 @@ const photoStyles = StyleSheet.create({
   },
   prominentBtnIcon: { fontSize: 16 },
   prominentBtnText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
-  thumbWrap: { position: 'relative', marginRight: 8 },
-  deleteCircle: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colours.error, alignItems: 'center', justifyContent: 'center' },
+  thumbWrap: { position: 'relative', marginRight: 12, marginTop: 4 },
+  deleteCircle: { position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: 12, backgroundColor: colours.error, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   deleteCircleText: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 14 },
   addMoreBtn: { alignSelf: 'flex-start', marginTop: 6 },
   addMoreText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
-  subtleThumbWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  subtleThumbWrap: { marginTop: 8, paddingTop: 8, overflow: 'visible' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -334,15 +334,15 @@ export default function ReportScreen() {
   const [localPhotoPreviews, setLocalPhotoPreviews] = useState<Record<string, string[]>>({});
 
   // Get all display URIs for a question's photos
+  // If local previews exist for this question, use those (they're fresher).
+  // Otherwise fall back to saved signed URLs from the database.
   function getPhotoDisplayUris(questionId: string): string[] {
     const local = localPhotoPreviews[questionId] ?? [];
+    if (local.length > 0) return local;
     const saved = answers[questionId]?.photo_urls ?? [];
-    const legacy = answers[questionId]?.photo_url ? [answers[questionId]!.photo_url!] : [];
-    // Merge: local previews first, then any saved URLs not already in local
-    const all = [...local];
-    for (const url of (saved.length > 0 ? saved : legacy)) {
-      if (!all.includes(url)) all.push(url);
-    }
+    if (saved.length > 0) return saved;
+    const legacy = answers[questionId]?.photo_url;
+    const all = legacy ? [legacy] : [];
     return all;
   }
 
