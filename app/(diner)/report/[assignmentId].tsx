@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, Image, Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
@@ -186,31 +187,66 @@ export default function ReportScreen() {
   const [answers, setAnswers] = useState<Record<string, ReportAnswer>>({});
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
-  // Track which non-photoPrompt questions have their extras panel open
   const [expandedExtras, setExpandedExtras] = useState<Set<string>>(new Set());
-  // Track which question is currently uploading a per-question photo
   const [uploadingQuestionId, setUploadingQuestionId] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dineTimers = useDineTimers();
 
-  // Merge remote answers into local on first load
+  // Local storage key for offline backup
+  const localKey = `draft_${assignmentId}`;
+
+  // Load: prefer local backup (fresher) over remote
   const answersRef = useRef(false);
-  if (report && !answersRef.current) {
-    setAnswers(report.answers ?? {});
-    answersRef.current = true;
-  }
+  useEffect(() => {
+    if (answersRef.current) return;
+    (async () => {
+      try {
+        const local = await AsyncStorage.getItem(localKey);
+        if (local) {
+          const parsed = JSON.parse(local);
+          const remoteCount = Object.keys(report?.answers ?? {}).filter(k => k !== '_timers').length;
+          const localCount = Object.keys(parsed).filter(k => k !== '_timers').length;
+          if (localCount >= remoteCount) {
+            setAnswers(parsed);
+            answersRef.current = true;
+            return;
+          }
+        }
+      } catch {}
+      if (report) {
+        setAnswers(report.answers ?? {});
+        answersRef.current = true;
+      }
+    })();
+  }, [report]);
+
+  // Save locally on every change (instant, works offline, never loses data)
+  const saveLocal = useCallback(async (data: Record<string, any>) => {
+    try { await AsyncStorage.setItem(localKey, JSON.stringify(data)); } catch {}
+  }, [localKey]);
 
   function updateAnswer(questionId: string, partial: Partial<ReportAnswer>) {
     const updated = { ...answers, [questionId]: { ...answers[questionId], ...partial } };
     setAnswers(updated);
+
+    // Always save locally first (instant, works offline)
+    const withTimers = { ...updated, _timers: dineTimers.timers };
+    saveLocal(withTimers);
+
+    // Sync to Supabase with a longer debounce (less network pressure)
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       if (report) {
-        // Include timer data under a special _timers key
-        const withTimers = { ...updated, _timers: dineTimers.timers };
-        saveDraft.mutate({ reportId: report.id, answers: withTimers });
+        saveDraft.mutate(
+          { reportId: report.id, answers: withTimers },
+          {
+            onSuccess: () => setSaveFailed(false),
+            onError: () => setSaveFailed(true),
+          }
+        );
       }
-    }, 2000);
+    }, 5000);
   }
 
   function toggleExtras(questionId: string) {
@@ -356,11 +392,23 @@ export default function ReportScreen() {
         {
           text: 'Submit',
           onPress: async () => {
-            await saveDraft.mutateAsync({ reportId: report.id, answers: { ...answers, _timers: dineTimers.timers } });
-            await submitReport.mutateAsync(report.id);
-            Alert.alert('Report submitted!', 'Thank you. Wendy will review your report shortly.', [
-              { text: 'Done', onPress: () => router.back() },
-            ]);
+            try {
+              // Save final answers + timers
+              await saveDraft.mutateAsync({ reportId: report.id, answers: { ...answers, _timers: dineTimers.timers } });
+              await submitReport.mutateAsync(report.id);
+              // Clear local backup on successful submit
+              await AsyncStorage.removeItem(localKey);
+              Alert.alert('Report submitted!', 'Thank you. Wendy will review your report shortly.', [
+                { text: 'Done', onPress: () => router.back() },
+              ]);
+            } catch (err) {
+              // Save is still in AsyncStorage — won't be lost
+              Alert.alert(
+                'Submission failed',
+                'Your answers are saved locally on your phone. Please check your internet connection and try again.',
+                [{ text: 'OK' }]
+              );
+            }
           },
         },
       ]
@@ -404,7 +452,8 @@ export default function ReportScreen() {
             <Text style={styles.backText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>{restaurantName}</Text>
-          {saveDraft.isPending && <Text style={styles.saving}>Saving…</Text>}
+          {saveDraft.isPending && <Text style={styles.saving}>Syncing…</Text>}
+          {saveFailed && !saveDraft.isPending && <Text style={styles.saveFailed}>Offline</Text>}
         </View>
       </View>
 
@@ -630,6 +679,7 @@ const styles = StyleSheet.create({
   backText: { color: colours.gold, fontSize: 16, fontWeight: '700' },
   headerTitle: { fontSize: 20, fontWeight: '800', color: colours.white, flex: 1 },
   saving: { fontSize: 12, color: colours.charcoalLight, fontStyle: 'italic' },
+  saveFailed: { fontSize: 11, color: colours.scoreFair, fontWeight: '700', backgroundColor: colours.scoreFair + '22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
   stickyTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold, paddingHorizontal: 16, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: colours.goldDark + '44' },
   stickyTimerLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
   stickyTimerTime: { fontSize: 18, fontWeight: '800', color: colours.charcoalDark, fontVariant: ['tabular-nums'] },
