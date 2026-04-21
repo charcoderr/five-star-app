@@ -439,9 +439,12 @@ export default function ReportScreen() {
     setLocalPhotos(prev => [...prev, uri]);
     if (report) {
       try {
-        await uploadPhoto.mutateAsync({ reportId: report.id, uri });
+        await Promise.race([
+          uploadPhoto.mutateAsync({ reportId: report.id, uri }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+        ]);
       } catch {
-        Alert.alert('Upload failed', 'Could not upload this photo. It has been saved locally for now.');
+        Alert.alert('Photo saved locally', 'The photo is on your phone but couldn\'t upload to the server. It will sync when you have a better connection.');
       }
     }
   }
@@ -474,20 +477,26 @@ export default function ReportScreen() {
         {
           text: 'Submit',
           onPress: async () => {
+            const withTimers = { ...answers, _timers: dineTimers.timers };
+            // Always save locally first
+            await saveLocal(withTimers);
+
             try {
-              // Save final answers + timers
-              await saveDraft.mutateAsync({ reportId: report.id, answers: { ...answers, _timers: dineTimers.timers } });
+              // Try to sync + submit with a 10-second timeout
+              const saveWithTimeout = Promise.race([
+                saveDraft.mutateAsync({ reportId: report.id, answers: withTimers }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+              ]);
+              await saveWithTimeout;
               await submitReport.mutateAsync(report.id);
-              // Clear local backup on successful submit
               await AsyncStorage.removeItem(localKey);
               Alert.alert('Report submitted!', 'Thank you. Wendy will review your report shortly.', [
                 { text: 'Done', onPress: () => router.back() },
               ]);
             } catch (err) {
-              // Save is still in AsyncStorage — won't be lost
               Alert.alert(
                 'Submission failed',
-                'Your answers are saved locally on your phone. Please check your internet connection and try again.',
+                'Your answers are saved safely on your phone. Please connect to a stronger Wi-Fi or mobile data and try again. Your data will not be lost.',
                 [{ text: 'OK' }]
               );
             }
