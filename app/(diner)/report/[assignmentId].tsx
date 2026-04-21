@@ -79,12 +79,14 @@ function QuestionPhoto({
   uploading,
   onPick,
   onView,
+  onDelete,
   prominent,
 }: {
   photoUrl?: string;
   uploading: boolean;
   onPick: () => void;
   onView?: (uri: string) => void;
+  onDelete?: () => void;
   prominent: boolean; // true = photoPrompt (always visible), false = subtle
 }) {
   if (prominent) {
@@ -95,12 +97,19 @@ function QuestionPhoto({
             <TouchableOpacity onPress={() => onView?.(photoUrl)}>
               <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
             </TouchableOpacity>
-            <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
-              {uploading
-                ? <ActivityIndicator color={colours.gold} size="small" />
-                : <Text style={photoStyles.replaceBtnText}>Replace photo</Text>
-              }
-            </TouchableOpacity>
+            <View style={{ gap: 8 }}>
+              <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
+                {uploading
+                  ? <ActivityIndicator color={colours.gold} size="small" />
+                  : <Text style={photoStyles.replaceBtnText}>Replace</Text>
+                }
+              </TouchableOpacity>
+              {onDelete && (
+                <TouchableOpacity onPress={onDelete}>
+                  <Text style={photoStyles.deleteText}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ) : (
           <TouchableOpacity style={photoStyles.prominentBtn} onPress={onPick} disabled={uploading}>
@@ -130,6 +139,11 @@ function QuestionPhoto({
           : <Text style={photoStyles.replaceBtnText}>Replace</Text>
         }
       </TouchableOpacity>
+      {onDelete && (
+        <TouchableOpacity onPress={onDelete}>
+          <Text style={photoStyles.deleteText}>Remove</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -148,6 +162,7 @@ const photoStyles = StyleSheet.create({
   },
   prominentBtnIcon: { fontSize: 16 },
   prominentBtnText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
+  deleteText: { fontSize: 12, color: colours.error, fontWeight: '600' },
   subtleThumbWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
 });
 
@@ -243,13 +258,21 @@ export default function ReportScreen() {
     });
   }
 
+  // Local preview URIs — used only during current session for instant display
+  const [localPhotoPreview, setLocalPhotoPreview] = useState<Record<string, string>>({});
+
+  // Get display URI for a question's photo — prefer local preview, fall back to signed URL
+  function getPhotoDisplayUri(questionId: string): string | undefined {
+    return localPhotoPreview[questionId] || answers[questionId]?.photo_url;
+  }
+
   // Upload a photo attached to a specific question
   async function pickQuestionPhoto(questionId: string) {
     const uri = await pickImage();
     if (!uri || !report) return;
 
-    // Show the local photo immediately while uploading
-    updateAnswer(questionId, { photo_url: uri });
+    // Show local preview immediately
+    setLocalPhotoPreview(prev => ({ ...prev, [questionId]: uri }));
     setUploadingQuestionId(questionId);
     try {
       const filename = `${report.id}/q_${questionId}_${Date.now()}.jpg`;
@@ -262,14 +285,32 @@ export default function ReportScreen() {
 
       if (uploadError) throw uploadError;
 
-      // Store the storage path for later retrieval (admin PDF etc.)
-      // Keep the local URI as photo_url for in-app display
-      updateAnswer(questionId, { photo_url: uri, photo_storage_path: filename });
+      // Generate a signed URL that works across devices
+      const { data: urlData } = await supabase.storage
+        .from('report-photos')
+        .createSignedUrl(filename, 604800); // 7 days
+
+      // Store signed URL + storage path in answers (persisted to DB)
+      updateAnswer(questionId, {
+        photo_url: urlData?.signedUrl ?? filename,
+        photo_storage_path: filename,
+      });
     } catch {
       Alert.alert('Upload failed', 'Could not upload this photo. Please try again.');
+      setLocalPhotoPreview(prev => { const n = { ...prev }; delete n[questionId]; return n; });
     } finally {
       setUploadingQuestionId(null);
     }
+  }
+
+  // Delete a photo from a question
+  async function deleteQuestionPhoto(questionId: string) {
+    const storagePath = answers[questionId]?.photo_storage_path;
+    if (storagePath) {
+      await supabase.storage.from('report-photos').remove([storagePath]);
+    }
+    setLocalPhotoPreview(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+    updateAnswer(questionId, { photo_url: undefined, photo_storage_path: undefined });
   }
 
   // Upload a general report photo (Wrap Up gallery)
@@ -421,7 +462,7 @@ export default function ReportScreen() {
 
               {questions.map(q => {
                 const extrasOpen = expandedExtras.has(q.id);
-                const hasQuestionPhoto = !!answers[q.id]?.photo_url;
+                const hasQuestionPhoto = !!(getPhotoDisplayUri(q.id));
                 const isUploadingThis = uploadingQuestionId === q.id;
 
                 return (
@@ -485,10 +526,11 @@ export default function ReportScreen() {
                     {/* Prominent photo prompt — always visible for photoPrompt questions */}
                     {q.photoPrompt && (
                       <QuestionPhoto
-                        photoUrl={answers[q.id]?.photo_url}
+                        photoUrl={getPhotoDisplayUri(q.id)}
                         uploading={isUploadingThis}
                         onPick={() => pickQuestionPhoto(q.id)}
                         onView={(uri) => setViewingPhoto(uri)}
+                        onDelete={() => deleteQuestionPhoto(q.id)}
                         prominent
                       />
                     )}
@@ -498,10 +540,11 @@ export default function ReportScreen() {
                       <View style={styles.extrasPanel}>
                         {hasQuestionPhoto ? (
                           <QuestionPhoto
-                            photoUrl={answers[q.id]?.photo_url}
+                            photoUrl={getPhotoDisplayUri(q.id)}
                             uploading={isUploadingThis}
                             onPick={() => pickQuestionPhoto(q.id)}
                             onView={(uri) => setViewingPhoto(uri)}
+                            onDelete={() => deleteQuestionPhoto(q.id)}
                             prominent={false}
                           />
                         ) : (

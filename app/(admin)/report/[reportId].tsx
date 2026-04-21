@@ -329,18 +329,14 @@ export default function AdminReportDetail() {
       // Refresh signed URLs for per-question photos (they expire)
       const freshAnswers = { ...report.answers };
       for (const [qId, ans] of Object.entries(freshAnswers) as [string, any][]) {
-        if (ans?.photo_url) {
-          // Extract storage path from the URL or use as-is if it's already a path
-          const path = ans.photo_url.includes('report-photos/')
-            ? ans.photo_url.split('report-photos/')[1]?.split('?')[0]
-            : ans.photo_url;
-          if (path) {
-            const { data: urlData } = await supabase.storage
-              .from('report-photos')
-              .createSignedUrl(path, 3600);
-            if (urlData?.signedUrl) {
-              freshAnswers[qId] = { ...ans, photo_url: urlData.signedUrl };
-            }
+        // Use photo_storage_path (reliable) to generate a fresh signed URL
+        const storagePath = ans?.photo_storage_path;
+        if (storagePath) {
+          const { data: urlData } = await supabase.storage
+            .from('report-photos')
+            .createSignedUrl(storagePath, 3600);
+          if (urlData?.signedUrl) {
+            freshAnswers[qId] = { ...ans, photo_url: urlData.signedUrl };
           }
         }
       }
