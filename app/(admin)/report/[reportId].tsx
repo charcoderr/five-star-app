@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
 import { useReportDetail, useReviewReport } from '../../../hooks/useAdmin';
 import { useReceiptUrl } from '../../../hooks/useReceipts';
+import { supabase } from '../../../lib/supabase';
 
 function ScoreBadge({ score }: { score: number }) {
   const colours_map = [colours.scorePoor, colours.scoreFair, colours.scoreGood, colours.scoreExcellent];
@@ -28,7 +29,32 @@ const badgeStyles = StyleSheet.create({
 });
 
 // ─── PDF Export ──────────────────────────────────────────────────────────────
-function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
+// Logo embedded as base64 so it renders in the PDF without a network request
+const LOGO_B64 = require('../../../assets/logo.png');
+// We'll use a data URI built at export time from the asset
+let _logoCachedUri: string | null = null;
+async function getLogoDataUri(): Promise<string> {
+  if (_logoCachedUri) return _logoCachedUri;
+  try {
+    const asset = require('../../../assets/logo.png');
+    const resolved = (Image as any).resolveAssetSource(asset);
+    if (resolved?.uri) {
+      const resp = await fetch(resolved.uri);
+      const blob = await resp.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          _logoCachedUri = reader.result as string;
+          resolve(_logoCachedUri);
+        };
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch {}
+  return '';
+}
+
+function buildReportPdf(report: any, proformaQuestions: any[], photos: any[], logoDataUri: string) {
   const restaurantName = report.restaurant?.name ?? 'Restaurant';
   const dinerName = report.diner?.name ?? '—';
   const visitDate = (report.assignment?.booking_date ?? report.assignment?.slot?.date)
@@ -36,7 +62,10 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
     : '—';
   const visitTime = (report.assignment?.booking_time ?? report.assignment?.slot?.time)?.slice(0, 5) ?? '';
   const adminNotes = report.admin_notes ?? '';
-  const answers = report.answers ?? {};
+  const allData = report.answers ?? {};
+  // Separate timer data from question answers
+  const timerData = allData._timers as Record<string, any> | undefined;
+  const answers = Object.fromEntries(Object.entries(allData).filter(([k]) => k !== '_timers'));
 
   const scorePalette = ['#D94F4F', '#F5A623', '#4CAF50', '#C9A84C'];
   const scoreLabels = ['Poor', 'Fair', 'Good', 'Excellent'];
@@ -123,9 +152,9 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
       }).join('');
 
       return `<div style="margin-bottom:32px;page-break-inside:avoid;">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cca300;padding-bottom:10px;margin-bottom:14px;">
           <span style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;">${cat}</span>
-          ${catMax > 0 ? `<span style="font-size:14px;font-weight:700;color:#C9A84C;">${catTotal} / ${catMax} (${catPct}%)</span>` : ''}
+          ${catMax > 0 ? `<span style="font-size:14px;font-weight:700;color:#cca300;">${catTotal} / ${catMax} (${catPct}%)</span>` : ''}
         </div>
         <table style="width:100%;border-collapse:collapse;">${rows}</table>
       </div>`;
@@ -135,66 +164,141 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
   const generalPhotos = photos.filter((p: any) => p.url);
   const photoSection = generalPhotos.length > 0 ? `
     <div style="margin-bottom:32px;page-break-before:always;">
-      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:16px;">Photos (${generalPhotos.length})</div>
+      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #cca300;padding-bottom:10px;margin-bottom:16px;">Photos (${generalPhotos.length})</div>
       ${generalPhotos.map((p: any) => `
         <div style="margin-bottom:16px;">
           <img src="${p.url}" style="width:100%;max-width:500px;border-radius:10px;border:1px solid #ddd;" />
         </div>`).join('')}
     </div>` : '';
 
+  // Category summary cards for front page
+  const catSummaryCards = categoryOrder
+    .filter(cat => categories[cat]?.length > 0)
+    .map(cat => {
+      const items = categories[cat];
+      const catScored = items.filter(i => i.answer?.score !== undefined);
+      const catTotal = catScored.reduce((s, i) => s + (i.answer.score ?? 0), 0);
+      const catMax = catScored.length * 3;
+      const catPct = catMax > 0 ? Math.round((catTotal / catMax) * 100) : 0;
+      const barColour = catPct >= 75 ? '#4CAF50' : catPct >= 50 ? '#F5A623' : '#D94F4F';
+      if (catMax === 0) return '';
+      return `<div style="display:inline-block;width:48%;margin-bottom:12px;vertical-align:top;">
+        <div style="font-size:12px;font-weight:700;color:#2C2C2E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">${cat}</div>
+        <div style="background:#eee;border-radius:4px;height:8px;margin-bottom:4px;">
+          <div style="background:${barColour};border-radius:4px;height:8px;width:${catPct}%;"></div>
+        </div>
+        <div style="font-size:12px;color:#555;">${catTotal} / ${catMax} (${catPct}%)</div>
+      </div>`;
+    }).join('');
+
+  // Timer section for PDF
+  const timerLabels: Record<string, string> = {
+    drinks_order: 'Drinks order taken', drinks_arrived: 'Drinks arrived',
+    food_order: 'Food order taken', starters_arrived: 'Starters arrived',
+    mains_arrived: 'Mains arrived', desserts_arrived: 'Desserts arrived',
+    bill_arrived: 'Bill arrived',
+  };
+  const timerSection = timerData ? (() => {
+    const entries = Object.entries(timerData).filter(([, t]: any) => t.status !== 'idle');
+    if (entries.length === 0) return '';
+    const rows = entries.map(([id, t]: any) => {
+      const label = timerLabels[id] ?? id;
+      const mins = t.elapsedSeconds ? Math.floor(t.elapsedSeconds / 60) : null;
+      const secs = t.elapsedSeconds ? t.elapsedSeconds % 60 : null;
+      const timeStr = mins !== null ? `${mins}:${String(secs).padStart(2, '0')}` : '\u2014';
+      const scoreCol = t.suggestedScore !== null ? scorePalette[t.suggestedScore] : '#999';
+      const scoreLabel = t.suggestedScore !== null ? scoreLabels[t.suggestedScore] : (t.status === 'skipped' ? 'Skipped' : '\u2014');
+      return `<tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;font-size:13px;color:#333;font-weight:500;">${label}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;font-size:15px;font-weight:700;color:#2C2C2E;font-variant-numeric:tabular-nums;">${t.status === 'skipped' ? '<em style="color:#999;font-weight:500;">Skipped</em>' : timeStr}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">
+          ${t.suggestedScore !== null ? `<span style="background:${scoreCol}18;color:${scoreCol};border:1.5px solid ${scoreCol};border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;">${t.suggestedScore} \u00b7 ${scoreLabel}</span>` : `<span style="color:#999;font-size:12px;">${scoreLabel}</span>`}
+        </td>
+      </tr>
+      ${t.notes ? `<tr><td colspan="3" style="padding:4px 12px 12px;font-size:12px;color:#555;font-style:italic;border-bottom:1px solid #e0e0e0;"><strong>Note:</strong> ${t.notes}</td></tr>` : ''}`;
+    }).join('');
+    return `<div style="margin-bottom:32px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cca300;padding-bottom:10px;margin-bottom:14px;">
+        <span style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;">Service Timers</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">${rows}</table>
+    </div>`;
+  })() : '';
+
+  const GOLD = '#cca300';
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
   body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; background: #fff; }
-  @page { margin: 0; }
+  @page { margin: 24px 0; }
 </style></head>
 <body>
-  <!-- Header -->
-  <div style="background:#2C2C2E;color:#fff;padding:40px 48px 32px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <!-- FRONT PAGE -->
+  <div style="border:3px solid ${GOLD};margin:16px;border-radius:16px;overflow:hidden;">
+    <!-- Header band -->
+    <div style="background:#2C2C2E;padding:28px 36px 24px;display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <div style="color:#C9A84C;font-size:14px;font-weight:800;letter-spacing:2px;margin-bottom:12px;">5STARX MYSTERY DINE REPORT</div>
-        <div style="font-size:28px;font-weight:800;margin-bottom:8px;">${restaurantName}</div>
-        <div style="font-size:14px;color:#bbb;line-height:1.6;">
-          Diner: ${dinerName}<br/>
-          Visit: ${visitDate}${visitTime ? ' at ' + visitTime : ''}<br/>
-          Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        <div style="color:${GOLD};font-size:14px;font-weight:800;letter-spacing:2px;margin-bottom:8px;">5STARX MYSTERY DINE REPORT</div>
+        <div style="font-size:24px;font-weight:800;color:#fff;margin-bottom:4px;">${restaurantName}</div>
+        <div style="font-size:13px;color:#ccc;margin-top:6px;">
+          ${visitDate}${visitTime ? ' at ' + visitTime : ''}
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="color:#C9A84C;font-size:42px;font-weight:800;letter-spacing:1px;">5Starx</div>
+      ${logoDataUri ? `<img src="${logoDataUri}" style="width:160px;height:160px;" />` : ''}
+    </div>
+
+    <!-- Score section -->
+    <div style="padding:24px 36px 20px;">
+      <!-- Star rating -->
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:12px;color:#2C2C2E;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;font-weight:800;">Overall Rating</div>
+        <div style="font-size:36px;margin-bottom:4px;"><span style="color:${GOLD};font-family:serif;">${max > 0 ? '\u2605'.repeat(starRounded) + '\u2606'.repeat(5 - starRounded) : '\u2014'}</span></div>
+        <div style="font-size:16px;color:#2C2C2E;font-weight:700;">${max > 0 ? `${total} / ${max} points \u00b7 ${starValue.toFixed(1)} out of 5.0` : 'No scored questions'}</div>
+      </div>
+
+      <!-- Score distribution -->
+      ${max > 0 ? `
+      <div style="border:2px solid ${GOLD};border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#2C2C2E;padding:14px 20px;">
+          <div style="font-size:11px;color:${GOLD};letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:800;">Score Distribution Across ${scored.length} Questions</div>
+          <table style="width:100%;">${breakdownRows}</table>
+        </div>
+      </div>` : ''}
+
+      <!-- Category summary -->
+      <div style="border:2px solid ${GOLD};border-radius:10px;padding:14px 20px;margin-bottom:16px;">
+        <div style="font-size:11px;color:${GOLD};letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:800;">Category Breakdown</div>
+        <div>${catSummaryCards}</div>
+      </div>
+
+      <!-- Report details -->
+      <div style="border-top:2px solid ${GOLD};padding-top:12px;">
+        <div style="font-size:12px;color:#333;line-height:1.8;">
+          <strong>Diner:</strong> ${dinerName} &nbsp;\u00b7&nbsp;
+          <strong>Visit:</strong> ${visitDate}${visitTime ? ' at ' + visitTime : ''} &nbsp;\u00b7&nbsp;
+          <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- DETAIL PAGES -->
   <div style="padding:36px 48px;">
-    <!-- Score card -->
-    <div style="background:#2C2C2E;color:#fff;border-radius:14px;padding:28px 32px;margin-bottom:32px;">
-      <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Overall Rating</div>
-        <div style="font-size:40px;color:#C9A84C;margin-bottom:6px;">${max > 0 ? '\u2605'.repeat(starRounded) + '\u2606'.repeat(5 - starRounded) : '\u2014'}</div>
-        <div style="font-size:16px;color:#ddd;font-weight:600;">${max > 0 ? `${total} / ${max} points \u00b7 ${starValue.toFixed(1)} out of 5.0` : 'No scored questions'}</div>
-      </div>
-      ${max > 0 ? `
-      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:18px;">
-        <div style="font-size:11px;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Score distribution across ${scored.length} questions</div>
-        <table style="width:100%;">${breakdownRows}</table>
-      </div>` : ''}
-    </div>
-
     ${adminNotes ? `
     <div style="margin-bottom:32px;">
-      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:14px;">Notes from 5StarX</div>
-      <div style="background:#C9A84C0D;border-left:4px solid #C9A84C;border-radius:8px;padding:16px 20px;font-size:14px;line-height:1.6;color:#333;">${adminNotes}</div>
+      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid ${GOLD};padding-bottom:10px;margin-bottom:14px;">Notes from 5StarX</div>
+      <div style="background:${GOLD}0D;border-left:4px solid ${GOLD};border-radius:8px;padding:16px 20px;font-size:14px;line-height:1.6;color:#333;">${adminNotes}</div>
     </div>` : ''}
 
+    ${timerSection}
     ${categorySections}
     ${photoSection}
   </div>
 
   <!-- Footer -->
   <div style="background:#2C2C2E;padding:20px 48px;text-align:center;">
-    <div style="color:#C9A84C;font-size:12px;font-weight:700;letter-spacing:1px;">5STARX</div>
+    <div style="color:${GOLD};font-size:12px;font-weight:700;letter-spacing:1px;">5STARX</div>
     <div style="font-size:11px;color:#888;margin-top:4px;">Confidential \u2014 prepared by 5StarX Mystery Dines \u00b7 www.5starx.com</div>
   </div>
 </body></html>`;
@@ -220,7 +324,42 @@ export default function AdminReportDetail() {
   async function handleExportPdf() {
     setExporting(true);
     try {
-      const html = buildReportPdf(report, proformaQuestions ?? [], photos ?? []);
+      const logoDataUri = await getLogoDataUri();
+
+      // Refresh signed URLs for per-question photos (they expire)
+      const freshAnswers = { ...report.answers };
+      for (const [qId, ans] of Object.entries(freshAnswers) as [string, any][]) {
+        if (ans?.photo_url) {
+          // Extract storage path from the URL or use as-is if it's already a path
+          const path = ans.photo_url.includes('report-photos/')
+            ? ans.photo_url.split('report-photos/')[1]?.split('?')[0]
+            : ans.photo_url;
+          if (path) {
+            const { data: urlData } = await supabase.storage
+              .from('report-photos')
+              .createSignedUrl(path, 3600);
+            if (urlData?.signedUrl) {
+              freshAnswers[qId] = { ...ans, photo_url: urlData.signedUrl };
+            }
+          }
+        }
+      }
+      const reportWithFreshPhotos = { ...report, answers: freshAnswers };
+
+      // Also refresh general report photos
+      const freshPhotos = await Promise.all(
+        (photos ?? []).map(async (p: any) => {
+          if (p.storage_path) {
+            const { data: urlData } = await supabase.storage
+              .from('report-photos')
+              .createSignedUrl(p.storage_path, 3600);
+            return { ...p, url: urlData?.signedUrl ?? p.url };
+          }
+          return p;
+        })
+      );
+
+      const html = buildReportPdf(reportWithFreshPhotos, proformaQuestions ?? [], freshPhotos, logoDataUri);
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {

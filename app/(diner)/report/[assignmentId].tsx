@@ -183,7 +183,11 @@ export default function ReportScreen() {
     setAnswers(updated);
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      if (report) saveDraft.mutate({ reportId: report.id, answers: updated });
+      if (report) {
+        // Include timer data under a special _timers key
+        const withTimers = { ...updated, _timers: dineTimers.timers };
+        saveDraft.mutate({ reportId: report.id, answers: withTimers });
+      }
     }, 2000);
   }
 
@@ -303,7 +307,7 @@ export default function ReportScreen() {
         {
           text: 'Submit',
           onPress: async () => {
-            await saveDraft.mutateAsync({ reportId: report.id, answers });
+            await saveDraft.mutateAsync({ reportId: report.id, answers: { ...answers, _timers: dineTimers.timers } });
             await submitReport.mutateAsync(report.id);
             Alert.alert('Report submitted!', 'Thank you. Wendy will review your report shortly.', [
               { text: 'Done', onPress: () => router.back() },
