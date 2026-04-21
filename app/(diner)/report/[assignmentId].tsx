@@ -199,16 +199,39 @@ export default function ReportScreen() {
     });
   }
 
-  // Upload a photo attached to a specific question — stores URL in answers[questionId].photo_url
-  async function pickQuestionPhoto(questionId: string) {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsMultipleSelection: false,
+  // Pick an image from camera or library
+  async function pickImage(): Promise<string | null> {
+    return new Promise(resolve => {
+      Alert.alert('Add Photo', 'Choose a source', [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) { Alert.alert('Camera access required'); resolve(null); return; }
+            const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+            resolve(result.canceled ? null : result.assets?.[0]?.uri ?? null);
+          },
+        },
+        {
+          text: 'Camera Roll',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.7,
+            });
+            resolve(result.canceled ? null : result.assets?.[0]?.uri ?? null);
+          },
+        },
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+      ]);
     });
-    if (result.canceled || !result.assets[0] || !report) return;
+  }
 
-    const uri = result.assets[0].uri;
+  // Upload a photo attached to a specific question — stores signed URL in answers[questionId].photo_url
+  async function pickQuestionPhoto(questionId: string) {
+    const uri = await pickImage();
+    if (!uri || !report) return;
+
     setUploadingQuestionId(questionId);
     try {
       const filename = `${report.id}/q_${questionId}_${Date.now()}.jpg`;
@@ -221,8 +244,10 @@ export default function ReportScreen() {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('report-photos').getPublicUrl(filename);
-      updateAnswer(questionId, { photo_url: urlData.publicUrl });
+      const { data: urlData } = await supabase.storage
+        .from('report-photos')
+        .createSignedUrl(filename, 86400);
+      updateAnswer(questionId, { photo_url: urlData?.signedUrl ?? filename });
     } catch {
       Alert.alert('Upload failed', 'Could not upload this photo. Please try again.');
     } finally {
@@ -232,20 +257,15 @@ export default function ReportScreen() {
 
   // Upload a general report photo (Wrap Up gallery)
   async function pickGeneralPhoto() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsMultipleSelection: false,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      setLocalPhotos(prev => [...prev, uri]);
-      if (report) {
-        try {
-          await uploadPhoto.mutateAsync({ reportId: report.id, uri });
-        } catch {
-          Alert.alert('Upload failed', 'Could not upload this photo. It has been saved locally for now.');
-        }
+    const uri = await pickImage();
+    if (!uri) return;
+
+    setLocalPhotos(prev => [...prev, uri]);
+    if (report) {
+      try {
+        await uploadPhoto.mutateAsync({ reportId: report.id, uri });
+      } catch {
+        Alert.alert('Upload failed', 'Could not upload this photo. It has been saved locally for now.');
       }
     }
   }
