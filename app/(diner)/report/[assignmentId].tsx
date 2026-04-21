@@ -206,10 +206,15 @@ export default function ReportScreen() {
         {
           text: 'Take Photo',
           onPress: async () => {
-            const perm = await ImagePicker.requestCameraPermissionsAsync();
-            if (!perm.granted) { Alert.alert('Camera access required'); resolve(null); return; }
-            const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-            resolve(result.canceled ? null : result.assets?.[0]?.uri ?? null);
+            try {
+              const perm = await ImagePicker.requestCameraPermissionsAsync();
+              if (!perm.granted) { Alert.alert('Camera access required'); resolve(null); return; }
+              const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+              resolve(result.canceled ? null : result.assets?.[0]?.uri ?? null);
+            } catch {
+              Alert.alert('Camera unavailable', 'Camera is not available on this device. Please use Camera Roll instead.');
+              resolve(null);
+            }
           },
         },
         {

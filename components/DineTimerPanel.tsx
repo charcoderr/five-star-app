@@ -58,6 +58,9 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onSkip, onManual, 
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
 
+  // Guard: state may be undefined if timers were added after the hook initialized
+  if (!state) return null;
+
   const isRunning  = state.status === 'running';
   const isStopped  = state.status === 'stopped' || state.status === 'manual';
   const isCancelled = state.status === 'cancelled';
