@@ -187,7 +187,7 @@ const sectionStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
   header: { paddingTop: 60, paddingBottom: 20, paddingHorizontal: 24, backgroundColor: colours.white, borderBottomWidth: 1, borderBottomColor: colours.border, alignItems: 'center' },
-  logo: { width: 140, height: 44, borderRadius: 5, marginBottom: 12 },
+  logo: { width: 80, height: 80, borderRadius: 10, marginBottom: 12 },
   title: { fontSize: 20, fontWeight: '700', color: colours.textPrimary },
   subtitle: { fontSize: 13, color: colours.textSecondary, marginTop: 4, textAlign: 'center' },
   scroll: { flex: 1 },

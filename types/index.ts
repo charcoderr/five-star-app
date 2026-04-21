@@ -46,6 +46,8 @@ export interface Assignment {
   booking_date?: string | null;
   booking_time?: string | null;
   booking_notes?: string | null;
+  // Receipt photo for reimbursement (no-voucher flow)
+  receipt_path?: string | null;
   slot?: Slot;
 }
 

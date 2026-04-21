@@ -22,7 +22,7 @@ export default function PendingApprovalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 },
-  logo: { width: 160, height: 52, borderRadius: 6, marginBottom: 40 },
+  logo: { width: 100, height: 100, borderRadius: 10, marginBottom: 40 },
   icon: { fontSize: 52, marginBottom: 16 },
   title: { fontSize: 22, fontWeight: '700', color: colours.textPrimary, textAlign: 'center', marginBottom: 16 },
   body: { fontSize: 15, color: colours.textSecondary, textAlign: 'center', lineHeight: 24 },

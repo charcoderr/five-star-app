@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Modal, Image,
+  ActivityIndicator, RefreshControl, Modal, Image, Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
 import { colours } from '../../utils/theme';
 import { useMyVouchers } from '../../hooks/useVouchers';
+import { useMyAssignments } from '../../hooks/useSlots';
+import { useUploadReceipt, useReceiptUrl } from '../../hooks/useReceipts';
 import { useAuthStore } from '../../stores/authStore';
 import { Voucher } from '../../types';
 import { formatVoucherExpiry } from '../../utils/voucher';
@@ -116,10 +119,72 @@ function QRModal({
   );
 }
 
+function ReceiptCard({ assignment }: { assignment: any }) {
+  const uploadReceipt = useUploadReceipt();
+  const { data: receiptUrl } = useReceiptUrl(assignment.receipt_path);
+  const restaurant = assignment.slot?.restaurant;
+
+  async function handleUpload() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    try {
+      await uploadReceipt.mutateAsync({ assignmentId: assignment.id, uri: result.assets[0].uri });
+      Alert.alert('Receipt uploaded', 'Wendy will review this alongside your report.');
+    } catch {
+      Alert.alert('Upload failed', 'Please try again.');
+    }
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={receiptStyles.headerLabel}>Receipt — Reimbursement</Text>
+        <View style={[styles.statusBadge, { backgroundColor: colours.scoreFair + '18', borderColor: colours.scoreFair }]}>
+          <Text style={[styles.statusText, { color: colours.scoreFair }]}>
+            {assignment.receipt_path ? 'Uploaded' : 'Pending'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.restaurantName}>{restaurant?.name ?? 'Restaurant'}</Text>
+        {assignment.booking_date && (
+          <Text style={receiptStyles.date}>
+            Dined {new Date(assignment.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </Text>
+        )}
+        {assignment.receipt_path && receiptUrl ? (
+          <View style={receiptStyles.previewRow}>
+            <Image source={{ uri: receiptUrl }} style={receiptStyles.thumb} />
+            <TouchableOpacity style={receiptStyles.replaceBtn} onPress={handleUpload}>
+              <Text style={receiptStyles.replaceBtnText}>Replace</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={receiptStyles.uploadBtn} onPress={handleUpload} disabled={uploadReceipt.isPending}>
+            {uploadReceipt.isPending
+              ? <ActivityIndicator color={colours.charcoalDark} />
+              : <Text style={receiptStyles.uploadBtnText}>Upload Receipt Photo</Text>}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function DinerVouchers() {
   const { user } = useAuthStore();
   const { data: vouchers, isLoading, refetch, isRefetching } = useMyVouchers(user?.id ?? '');
+  const { data: assignments } = useMyAssignments(user?.id ?? '');
   const [selectedVoucher, setSelectedVoucher] = useState<(Voucher & { assignment: any }) | null>(null);
+
+  // Assignments with no voucher (reimbursement flow)
+  const voucherIds = new Set((vouchers ?? []).map(v => v.assignment_id));
+  const receiptAssignments = (assignments ?? []).filter(
+    a => (a.status === 'confirmed' || a.status === 'completed') && !voucherIds.has(a.id)
+  );
 
   if (isLoading) {
     return (
@@ -164,6 +229,17 @@ export default function DinerVouchers() {
         }}
       />
 
+      {/* Receipt upload section — dines with no voucher */}
+      {receiptAssignments.length > 0 && (
+        <View style={receiptStyles.section}>
+          <Text style={receiptStyles.sectionTitle}>RECEIPTS</Text>
+          <Text style={receiptStyles.sectionSub}>Upload your receipt for dines where no voucher was issued</Text>
+          {receiptAssignments.map(a => (
+            <ReceiptCard key={a.id} assignment={a} />
+          ))}
+        </View>
+      )}
+
       {selectedVoucher && (
         <QRModal
           voucher={selectedVoucher}
@@ -204,10 +280,24 @@ const styles = StyleSheet.create({
   tapHint: { fontSize: 12, color: colours.gold, fontWeight: '600', marginTop: 12 },
 });
 
+const receiptStyles = StyleSheet.create({
+  section: { paddingHorizontal: 16, paddingBottom: 16 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: colours.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  sectionSub: { fontSize: 13, color: colours.textMuted, marginBottom: 12 },
+  headerLabel: { fontSize: 13, fontWeight: '700', color: colours.white },
+  date: { fontSize: 13, color: colours.textSecondary, marginBottom: 12 },
+  uploadBtn: { backgroundColor: colours.gold, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  uploadBtnText: { fontSize: 15, fontWeight: '700', color: colours.charcoalDark },
+  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  thumb: { width: 80, height: 100, borderRadius: 8, backgroundColor: colours.offWhite },
+  replaceBtn: { paddingHorizontal: 14, paddingVertical: 8 },
+  replaceBtnText: { fontSize: 13, color: colours.gold, fontWeight: '700' },
+});
+
 const modalStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: colours.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 32, alignItems: 'center', paddingBottom: 48 },
-  logo: { width: 130, height: 42, borderRadius: 5, marginBottom: 20 },
+  logo: { width: 70, height: 70, borderRadius: 10, marginBottom: 20 },
   restaurant: { fontSize: 16, fontWeight: '700', color: colours.textPrimary, marginBottom: 4 },
   value: { fontSize: 56, fontWeight: '800', color: colours.charcoalDark, lineHeight: 64 },
   valueLabel: { fontSize: 16, color: colours.textSecondary, marginBottom: 24 },

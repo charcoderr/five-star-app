@@ -295,7 +295,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
   inner: { flexGrow: 1, paddingHorizontal: 28, paddingVertical: 48 },
-  logo: { width: 180, height: 58, alignSelf: 'center', borderRadius: 6, marginBottom: 24 },
+  logo: { width: 100, height: 100, alignSelf: 'center', borderRadius: 10, marginBottom: 24 },
   stepRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 28 },
   stepDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: colours.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.white },
   stepDotActive: { backgroundColor: colours.gold, borderColor: colours.gold },

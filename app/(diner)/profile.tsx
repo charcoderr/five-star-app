@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colours.offWhite },
   content: { alignItems: 'center', paddingTop: 60, paddingBottom: 20, paddingHorizontal: 20 },
 
-  logo: { width: 140, height: 46, borderRadius: 6, marginBottom: 28 },
+  logo: { width: 80, height: 80, borderRadius: 10, marginBottom: 28 },
 
   avatarWrap: { position: 'relative', marginBottom: 12 },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colours.gold, alignItems: 'center', justifyContent: 'center' },

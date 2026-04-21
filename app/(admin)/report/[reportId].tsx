@@ -6,6 +6,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { colours, SCORE_LABELS } from '../../../utils/theme';
 import { useReportDetail, useReviewReport } from '../../../hooks/useAdmin';
+import { useReceiptUrl } from '../../../hooks/useReceipts';
 
 function ScoreBadge({ score }: { score: number }) {
   const colours_map = [colours.scorePoor, colours.scoreFair, colours.scoreGood, colours.scoreExcellent];
@@ -35,6 +36,7 @@ export default function AdminReportDetail() {
   }
 
   const { report, photos, proformaQuestions } = data ?? {};
+  const { data: receiptUrl } = useReceiptUrl(report?.assignment?.receipt_path);
   if (!report) return <View style={styles.centered}><Text>Report not found.</Text></View>;
 
   const answers = report.answers ?? {};
@@ -275,6 +277,14 @@ export default function AdminReportDetail() {
                 ))}
               </View>
             </ScrollView>
+          </View>
+        )}
+
+        {/* Diner receipt (reimbursement flow) */}
+        {report.assignment?.receipt_path && receiptUrl && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Diner Receipt (Reimbursement)</Text>
+            <Image source={{ uri: receiptUrl }} style={{ width: '100%', height: 300, borderRadius: 10 }} resizeMode="contain" />
           </View>
         )}
 

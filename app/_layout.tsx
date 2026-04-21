@@ -9,7 +9,7 @@ import { registerPushToken, useNotificationListeners } from '../hooks/useNotific
 const queryClient = new QueryClient();
 
 function AuthGuard() {
-  const { session, user, isLoading, setSession, setUser, setLoading } = useAuthStore();
+  const { session, user, isLoading, splashComplete, setSession, setUser, setLoading } = useAuthStore();
   const segments = useSegments();
 
   // Set up push notification listeners (tap-to-navigate)
@@ -63,6 +63,9 @@ function AuthGuard() {
     const inAuthGroup = firstSegment === '(auth)';
     const atRoot = !firstSegment;
 
+    // Don't navigate away from the splash animation until it finishes
+    if (atRoot && !splashComplete) return;
+
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
       return;
@@ -72,7 +75,7 @@ function AuthGuard() {
     if (session && user && (inAuthGroup || atRoot)) {
       routeByRole(user);
     }
-  }, [session, user, isLoading, segments]);
+  }, [session, user, isLoading, splashComplete, segments]);
 
   return null;
 }

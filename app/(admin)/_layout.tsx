@@ -28,16 +28,21 @@ export default function AdminLayout() {
         tabBarLabelStyle: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.2, marginTop: 2 },
       }}
     >
-      <Tabs.Screen name="dashboard"   options={{ title: 'Home',    tabBarIcon: tabIcon('home-outline') }} />
-      <Tabs.Screen name="slots"       options={{ title: 'Dines',   tabBarIcon: tabIcon('calendar-outline') }} />
-      <Tabs.Screen name="reports"     options={{ title: 'Reports', tabBarIcon: tabIcon('document-text-outline') }} />
-      <Tabs.Screen name="restaurants" options={{ title: 'Restaurants', tabBarIcon: tabIcon('restaurant-outline') }} />
-      <Tabs.Screen name="diners"      options={{ title: 'Diners',  tabBarIcon: tabIcon('people-outline') }} />
-      {/* Hidden screens — navigated to from dashboard quick actions */}
-      <Tabs.Screen name="vouchers"    options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
-      <Tabs.Screen name="tcs-editor"  options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
-      <Tabs.Screen name="report"      options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
-      <Tabs.Screen name="restaurant"  options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
+      {/* Visible tabs — 4 items fit cleanly without text truncation */}
+      <Tabs.Screen name="dashboard"   options={{ title: 'Home',   tabBarIcon: tabIcon('home-outline') }} />
+      <Tabs.Screen name="slots"       options={{ title: 'Dines',  tabBarIcon: tabIcon('calendar-outline') }} />
+      <Tabs.Screen name="diners"      options={{ title: 'Diners', tabBarIcon: tabIcon('people-outline') }} />
+      <Tabs.Screen name="more"        options={{ title: 'More',   tabBarIcon: tabIcon('ellipsis-horizontal-outline') }} />
+
+      {/* Hidden from tab bar — accessed via More screen or push navigation.
+          tabBarButton renders nothing; tabBarItemStyle ensures zero width
+          so the tab bar doesn't allocate space for these items. */}
+      <Tabs.Screen name="reports"     options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="restaurants" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="vouchers"    options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="tcs-editor"  options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="report"      options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="restaurant"  options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
     </Tabs>
   );
 }

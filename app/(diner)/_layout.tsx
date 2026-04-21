@@ -81,8 +81,8 @@ export default function DinerLayout() {
       <Tabs.Screen name="vouchers"       options={{ title: 'Vouchers',  tabBarIcon: tabIcon('ticket-outline') }} />
       <Tabs.Screen name="profile"        options={{ title: 'Profile',   tabBarIcon: tabIcon('person-outline') }} />
       {/* Hidden — navigated to programmatically */}
-      <Tabs.Screen name="notifications" options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
-      <Tabs.Screen name="report"        options={{ href: null, tabBarItemStyle: { display: 'none' } }} />
+      <Tabs.Screen name="notifications" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      <Tabs.Screen name="report"        options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
     </Tabs>
   );
 }
