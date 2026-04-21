@@ -2,6 +2,7 @@
   "expo": {
     "name": "5StarX",
     "slug": "5starx",
+    "owner": "fuseva",
     "version": "1.0.0",
     "runtimeVersion": {
       "policy": "appVersion"
@@ -46,7 +47,7 @@
       "favicon": "./assets/favicon.png"
     },
     "updates": {
-      "url": "https://u.expo.dev/REPLACE_WITH_YOUR_EAS_PROJECT_ID"
+      "url": "https://u.expo.dev/11633646-6ade-4adf-b050-8b02aa2ea0a4"
     },
     "plugins": [
       "expo-router",
@@ -68,7 +69,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_YOUR_EAS_PROJECT_ID"
+        "projectId": "11633646-6ade-4adf-b050-8b02aa2ea0a4"
       }
     }
   }
