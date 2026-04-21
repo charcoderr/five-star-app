@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, Image,
+  TextInput, ActivityIndicator, Alert, Image, Modal,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -78,11 +78,13 @@ function QuestionPhoto({
   photoUrl,
   uploading,
   onPick,
+  onView,
   prominent,
 }: {
   photoUrl?: string;
   uploading: boolean;
   onPick: () => void;
+  onView?: (uri: string) => void;
   prominent: boolean; // true = photoPrompt (always visible), false = subtle
 }) {
   if (prominent) {
@@ -90,7 +92,9 @@ function QuestionPhoto({
       <View style={photoStyles.prominentWrap}>
         {photoUrl ? (
           <View style={photoStyles.row}>
-            <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+            <TouchableOpacity onPress={() => onView?.(photoUrl)}>
+              <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+            </TouchableOpacity>
             <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
               {uploading
                 ? <ActivityIndicator color={colours.gold} size="small" />
@@ -117,7 +121,9 @@ function QuestionPhoto({
   if (!photoUrl) return null;
   return (
     <View style={photoStyles.subtleThumbWrap}>
-      <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+      <TouchableOpacity onPress={() => onView?.(photoUrl)}>
+        <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+      </TouchableOpacity>
       <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
         {uploading
           ? <ActivityIndicator color={colours.gold} size="small" />
@@ -164,6 +170,7 @@ export default function ReportScreen() {
 
   const [answers, setAnswers] = useState<Record<string, ReportAnswer>>({});
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
   // Track which non-photoPrompt questions have their extras panel open
   const [expandedExtras, setExpandedExtras] = useState<Set<string>>(new Set());
   // Track which question is currently uploading a per-question photo
@@ -236,11 +243,13 @@ export default function ReportScreen() {
     });
   }
 
-  // Upload a photo attached to a specific question — stores signed URL in answers[questionId].photo_url
+  // Upload a photo attached to a specific question
   async function pickQuestionPhoto(questionId: string) {
     const uri = await pickImage();
     if (!uri || !report) return;
 
+    // Show the local photo immediately while uploading
+    updateAnswer(questionId, { photo_url: uri });
     setUploadingQuestionId(questionId);
     try {
       const filename = `${report.id}/q_${questionId}_${Date.now()}.jpg`;
@@ -253,10 +262,9 @@ export default function ReportScreen() {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = await supabase.storage
-        .from('report-photos')
-        .createSignedUrl(filename, 86400);
-      updateAnswer(questionId, { photo_url: urlData?.signedUrl ?? filename });
+      // Store the storage path for later retrieval (admin PDF etc.)
+      // Keep the local URI as photo_url for in-app display
+      updateAnswer(questionId, { photo_url: uri, photo_storage_path: filename });
     } catch {
       Alert.alert('Upload failed', 'Could not upload this photo. Please try again.');
     } finally {
@@ -480,6 +488,7 @@ export default function ReportScreen() {
                         photoUrl={answers[q.id]?.photo_url}
                         uploading={isUploadingThis}
                         onPick={() => pickQuestionPhoto(q.id)}
+                        onView={(uri) => setViewingPhoto(uri)}
                         prominent
                       />
                     )}
@@ -492,6 +501,7 @@ export default function ReportScreen() {
                             photoUrl={answers[q.id]?.photo_url}
                             uploading={isUploadingThis}
                             onPick={() => pickQuestionPhoto(q.id)}
+                            onView={(uri) => setViewingPhoto(uri)}
                             prominent={false}
                           />
                         ) : (
@@ -550,6 +560,18 @@ export default function ReportScreen() {
         </TouchableOpacity>
         <View style={styles.bottomPad} />
       </ScrollView>
+
+      {/* Full-screen photo viewer */}
+      {viewingPhoto && (
+        <Modal visible animationType="fade" transparent>
+          <View style={styles.photoViewerOverlay}>
+            <TouchableOpacity style={styles.photoViewerClose} onPress={() => setViewingPhoto(null)}>
+              <Text style={styles.photoViewerCloseText}>Close</Text>
+            </TouchableOpacity>
+            <Image source={{ uri: viewingPhoto }} style={styles.photoViewerImage} resizeMode="contain" />
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -597,4 +619,8 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: colours.gold, borderRadius: 12, padding: 17, alignItems: 'center', marginTop: 8 },
   submitBtnText: { fontSize: 16, fontWeight: '700', color: colours.charcoalDark },
   bottomPad: { height: 40 },
+  photoViewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  photoViewerImage: { width: '90%', height: '70%' },
+  photoViewerClose: { position: 'absolute', top: 60, right: 20, zIndex: 10, padding: 12 },
+  photoViewerCloseText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

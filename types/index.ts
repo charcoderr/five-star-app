@@ -79,7 +79,8 @@ export interface ReportAnswer {
   value?: boolean;      // for yes_no
   text?: string;        // for free_text or notes on any question
   notes?: string;       // additional notes on scored questions
-  photo_url?: string;   // signed URL for per-question photo (if photoPrompt)
+  photo_url?: string;          // local URI or signed URL for display
+  photo_storage_path?: string; // Supabase Storage path for later retrieval
 }
 
 export interface Report {

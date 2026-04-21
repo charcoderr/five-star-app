@@ -7,8 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  ScrollView,
   Image,
 } from 'react-native';
 import { Link } from 'expo-router';
@@ -32,11 +31,11 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <ScrollView
+      contentContainerStyle={styles.inner}
+      keyboardShouldPersistTaps="handled"
+      bounces={false}
     >
-      <View style={styles.inner}>
         <View style={styles.logoContainer}>
           <Image
             source={require('../../assets/logo.png')}
@@ -78,14 +77,12 @@ export default function LoginScreen() {
         <Link href="/(auth)/forgot-password" style={styles.link}>
           Forgot password?
         </Link>
-      </View>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colours.offWhite },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
+  inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 32, backgroundColor: colours.offWhite },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 48,
