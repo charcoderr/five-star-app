@@ -17,30 +17,45 @@ import { DINE_TIMERS, formatSeconds } from '../../../utils/dineTimers';
 import { supabase } from '../../../lib/supabase';
 
 // ─── Score Picker ─────────────────────────────────────────────────────────────
+// value: 0-3 for scored, -1 for N/A, undefined for unanswered
 function ScorePicker({ value, onChange }: { value?: number; onChange: (v: number) => void }) {
+  const isNA = value === -1;
   return (
-    <View style={scoreStyles.row}>
-      {SCORE_LABELS.map((label, index) => (
-        <TouchableOpacity
-          key={label}
-          style={[scoreStyles.btn, value === index && scoreStyles.btnActive]}
-          onPress={() => onChange(index)}
-        >
-          <Text style={[scoreStyles.btnText, value === index && scoreStyles.btnTextActive]}>
-            {label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <View style={scoreStyles.wrap}>
+      <View style={scoreStyles.row}>
+        {SCORE_LABELS.map((label, index) => (
+          <TouchableOpacity
+            key={label}
+            style={[scoreStyles.btn, value === index && scoreStyles.btnActive]}
+            onPress={() => onChange(index)}
+          >
+            <Text style={[scoreStyles.btnText, value === index && scoreStyles.btnTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TouchableOpacity
+        style={[scoreStyles.naBtn, isNA && scoreStyles.naBtnActive]}
+        onPress={() => onChange(-1)}
+      >
+        <Text style={[scoreStyles.naText, isNA && scoreStyles.naTextActive]}>N/A</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const scoreStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 4, flexWrap: 'wrap', marginTop: 6 },
+  wrap: { marginTop: 6 },
+  row: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
   btn: { flex: 1, minWidth: 60, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5, borderColor: colours.border, alignItems: 'center', backgroundColor: colours.white },
   btnActive: { borderColor: colours.gold, backgroundColor: colours.gold },
   btnText: { fontSize: 11, fontWeight: '700', color: colours.textMuted },
   btnTextActive: { color: colours.charcoalDark },
+  naBtn: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 6, borderWidth: 1.5, borderColor: colours.border },
+  naBtnActive: { borderColor: colours.textMuted, backgroundColor: colours.textMuted },
+  naText: { fontSize: 11, fontWeight: '700', color: colours.textMuted },
+  naTextActive: { color: colours.white },
 });
 
 // ─── Yes/No Picker ────────────────────────────────────────────────────────────
@@ -62,12 +77,13 @@ function YesNoPicker({ value, onChange }: { value?: boolean; onChange: (v: boole
   );
 }
 
-// ─── Section total ────────────────────────────────────────────────────────────
+// ─── Section total (excludes N/A answers from both total and max) ────────────
 function sectionScore(questions: ProformaQuestion[], answers: Record<string, ReportAnswer>) {
   let total = 0;
   let max = 0;
   questions.filter(q => q.type === 'scored').forEach(q => {
     const a = answers[q.id];
+    if (a?.score === -1) return; // N/A — excluded from scoring
     if (a?.score !== undefined) total += a.score;
     max += 3;
   });
@@ -81,36 +97,45 @@ function QuestionPhoto({
   onPick,
   onView,
   onDelete,
+  photoUrls,
   prominent,
 }: {
   photoUrl?: string;
+  photoUrls?: string[];
   uploading: boolean;
   onPick: () => void;
   onView?: (uri: string) => void;
-  onDelete?: () => void;
-  prominent: boolean; // true = photoPrompt (always visible), false = subtle
+  onDelete?: (index: number) => void;
+  prominent: boolean;
 }) {
+  const allPhotos = photoUrls?.length ? photoUrls : (photoUrl ? [photoUrl] : []);
+
   if (prominent) {
     return (
       <View style={photoStyles.prominentWrap}>
-        {photoUrl ? (
-          <View style={photoStyles.row}>
-            <TouchableOpacity onPress={() => onView?.(photoUrl)}>
-              <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
+        {allPhotos.length > 0 ? (
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+              <View style={photoStyles.row}>
+                {allPhotos.map((uri, i) => (
+                  <View key={i} style={photoStyles.thumbWrap}>
+                    <TouchableOpacity onPress={() => onView?.(uri)}>
+                      <Image source={{ uri }} style={photoStyles.thumb} />
+                    </TouchableOpacity>
+                    {onDelete && (
+                      <TouchableOpacity style={photoStyles.deleteCircle} onPress={() => onDelete(i)}>
+                        <Text style={photoStyles.deleteCircleText}>x</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+            <TouchableOpacity style={photoStyles.addMoreBtn} onPress={onPick} disabled={uploading}>
+              {uploading
+                ? <ActivityIndicator color={colours.gold} size="small" />
+                : <Text style={photoStyles.addMoreText}>+ Add another photo</Text>}
             </TouchableOpacity>
-            <View style={{ gap: 8 }}>
-              <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
-                {uploading
-                  ? <ActivityIndicator color={colours.gold} size="small" />
-                  : <Text style={photoStyles.replaceBtnText}>Replace</Text>
-                }
-              </TouchableOpacity>
-              {onDelete && (
-                <TouchableOpacity onPress={onDelete}>
-                  <Text style={photoStyles.deleteText}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
           </View>
         ) : (
           <TouchableOpacity style={photoStyles.prominentBtn} onPress={onPick} disabled={uploading}>
@@ -127,24 +152,31 @@ function QuestionPhoto({
     );
   }
 
-  // Subtle: just show thumbnail if already uploaded, otherwise nothing (parent controls visibility)
-  if (!photoUrl) return null;
+  // Subtle: show thumbnails if photos exist
+  if (allPhotos.length === 0) return null;
   return (
     <View style={photoStyles.subtleThumbWrap}>
-      <TouchableOpacity onPress={() => onView?.(photoUrl)}>
-        <Image source={{ uri: photoUrl }} style={photoStyles.thumb} />
-      </TouchableOpacity>
-      <TouchableOpacity style={photoStyles.replaceBtn} onPress={onPick} disabled={uploading}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={photoStyles.row}>
+          {allPhotos.map((uri, i) => (
+            <View key={i} style={photoStyles.thumbWrap}>
+              <TouchableOpacity onPress={() => onView?.(uri)}>
+                <Image source={{ uri }} style={photoStyles.thumb} />
+              </TouchableOpacity>
+              {onDelete && (
+                <TouchableOpacity style={photoStyles.deleteCircle} onPress={() => onDelete(i)}>
+                  <Text style={photoStyles.deleteCircleText}>x</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+      <TouchableOpacity style={photoStyles.addMoreBtn} onPress={onPick} disabled={uploading}>
         {uploading
           ? <ActivityIndicator color={colours.gold} size="small" />
-          : <Text style={photoStyles.replaceBtnText}>Replace</Text>
-        }
+          : <Text style={photoStyles.addMoreText}>+ Add more</Text>}
       </TouchableOpacity>
-      {onDelete && (
-        <TouchableOpacity onPress={onDelete}>
-          <Text style={photoStyles.deleteText}>Remove</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -163,7 +195,11 @@ const photoStyles = StyleSheet.create({
   },
   prominentBtnIcon: { fontSize: 16 },
   prominentBtnText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
-  deleteText: { fontSize: 12, color: colours.error, fontWeight: '600' },
+  thumbWrap: { position: 'relative', marginRight: 8 },
+  deleteCircle: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colours.error, alignItems: 'center', justifyContent: 'center' },
+  deleteCircleText: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 14 },
+  addMoreBtn: { alignSelf: 'flex-start', marginTop: 6 },
+  addMoreText: { fontSize: 13, color: colours.gold, fontWeight: '600' },
   subtleThumbWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
 });
 
@@ -294,21 +330,37 @@ export default function ReportScreen() {
     });
   }
 
-  // Local preview URIs — used only during current session for instant display
-  const [localPhotoPreview, setLocalPhotoPreview] = useState<Record<string, string>>({});
+  // Local preview URIs per question (multiple photos)
+  const [localPhotoPreviews, setLocalPhotoPreviews] = useState<Record<string, string[]>>({});
 
-  // Get display URI for a question's photo — prefer local preview, fall back to signed URL
-  function getPhotoDisplayUri(questionId: string): string | undefined {
-    return localPhotoPreview[questionId] || answers[questionId]?.photo_url;
+  // Get all display URIs for a question's photos
+  function getPhotoDisplayUris(questionId: string): string[] {
+    const local = localPhotoPreviews[questionId] ?? [];
+    const saved = answers[questionId]?.photo_urls ?? [];
+    const legacy = answers[questionId]?.photo_url ? [answers[questionId]!.photo_url!] : [];
+    // Merge: local previews first, then any saved URLs not already in local
+    const all = [...local];
+    for (const url of (saved.length > 0 ? saved : legacy)) {
+      if (!all.includes(url)) all.push(url);
+    }
+    return all;
   }
 
-  // Upload a photo attached to a specific question
+  // Backward compat helper
+  function getPhotoDisplayUri(questionId: string): string | undefined {
+    return getPhotoDisplayUris(questionId)[0];
+  }
+
+  // Upload a photo attached to a question (supports multiple)
   async function pickQuestionPhoto(questionId: string) {
     const uri = await pickImage();
     if (!uri || !report) return;
 
     // Show local preview immediately
-    setLocalPhotoPreview(prev => ({ ...prev, [questionId]: uri }));
+    setLocalPhotoPreviews(prev => ({
+      ...prev,
+      [questionId]: [...(prev[questionId] ?? []), uri],
+    }));
     setUploadingQuestionId(questionId);
     try {
       const filename = `${report.id}/q_${questionId}_${Date.now()}.jpg`;
@@ -321,32 +373,62 @@ export default function ReportScreen() {
 
       if (uploadError) throw uploadError;
 
-      // Generate a signed URL that works across devices
       const { data: urlData } = await supabase.storage
         .from('report-photos')
-        .createSignedUrl(filename, 604800); // 7 days
+        .createSignedUrl(filename, 604800);
 
-      // Store signed URL + storage path in answers (persisted to DB)
+      const signedUrl = urlData?.signedUrl ?? filename;
+      const existing = answers[questionId];
+      const urls = [...(existing?.photo_urls ?? []), signedUrl];
+      const paths = [...(existing?.photo_storage_paths ?? []), filename];
+
       updateAnswer(questionId, {
-        photo_url: urlData?.signedUrl ?? filename,
-        photo_storage_path: filename,
+        photo_url: urls[0],
+        photo_storage_path: paths[0],
+        photo_urls: urls,
+        photo_storage_paths: paths,
       });
     } catch {
       Alert.alert('Upload failed', 'Could not upload this photo. Please try again.');
-      setLocalPhotoPreview(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+      // Remove the failed local preview
+      setLocalPhotoPreviews(prev => ({
+        ...prev,
+        [questionId]: (prev[questionId] ?? []).filter(u => u !== uri),
+      }));
     } finally {
       setUploadingQuestionId(null);
     }
   }
 
-  // Delete a photo from a question
-  async function deleteQuestionPhoto(questionId: string) {
-    const storagePath = answers[questionId]?.photo_storage_path;
-    if (storagePath) {
-      await supabase.storage.from('report-photos').remove([storagePath]);
+  // Delete a specific photo from a question
+  async function deleteQuestionPhoto(questionId: string, index?: number) {
+    const existing = answers[questionId];
+    if (index !== undefined && existing?.photo_storage_paths) {
+      // Delete specific photo
+      const path = existing.photo_storage_paths[index];
+      if (path) await supabase.storage.from('report-photos').remove([path]);
+      const urls = [...(existing.photo_urls ?? [])];
+      const paths = [...(existing.photo_storage_paths ?? [])];
+      urls.splice(index, 1);
+      paths.splice(index, 1);
+      setLocalPhotoPreviews(prev => {
+        const arr = [...(prev[questionId] ?? [])];
+        if (index < arr.length) arr.splice(index, 1);
+        return { ...prev, [questionId]: arr };
+      });
+      updateAnswer(questionId, {
+        photo_url: urls[0] ?? undefined,
+        photo_storage_path: paths[0] ?? undefined,
+        photo_urls: urls.length > 0 ? urls : undefined,
+        photo_storage_paths: paths.length > 0 ? paths : undefined,
+      });
+    } else {
+      // Delete all photos (legacy single-photo)
+      const path = existing?.photo_storage_path;
+      if (path) await supabase.storage.from('report-photos').remove([path]);
+      setLocalPhotoPreviews(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+      updateAnswer(questionId, { photo_url: undefined, photo_storage_path: undefined, photo_urls: undefined, photo_storage_paths: undefined });
     }
-    setLocalPhotoPreview(prev => { const n = { ...prev }; delete n[questionId]; return n; });
-    updateAnswer(questionId, { photo_url: undefined, photo_storage_path: undefined });
   }
 
   // Upload a general report photo (Wrap Up gallery)
@@ -576,10 +658,11 @@ export default function ReportScreen() {
                     {q.photoPrompt && (
                       <QuestionPhoto
                         photoUrl={getPhotoDisplayUri(q.id)}
+                        photoUrls={getPhotoDisplayUris(q.id)}
                         uploading={isUploadingThis}
                         onPick={() => pickQuestionPhoto(q.id)}
                         onView={(uri) => setViewingPhoto(uri)}
-                        onDelete={() => deleteQuestionPhoto(q.id)}
+                        onDelete={(i) => deleteQuestionPhoto(q.id, i)}
                         prominent
                       />
                     )}
@@ -590,10 +673,11 @@ export default function ReportScreen() {
                         {hasQuestionPhoto ? (
                           <QuestionPhoto
                             photoUrl={getPhotoDisplayUri(q.id)}
+                            photoUrls={getPhotoDisplayUris(q.id)}
                             uploading={isUploadingThis}
                             onPick={() => pickQuestionPhoto(q.id)}
                             onView={(uri) => setViewingPhoto(uri)}
-                            onDelete={() => deleteQuestionPhoto(q.id)}
+                            onDelete={(i) => deleteQuestionPhoto(q.id, i)}
                             prominent={false}
                           />
                         ) : (

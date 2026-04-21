@@ -79,8 +79,10 @@ export interface ReportAnswer {
   value?: boolean;      // for yes_no
   text?: string;        // for free_text or notes on any question
   notes?: string;       // additional notes on scored questions
-  photo_url?: string;          // local URI or signed URL for display
-  photo_storage_path?: string; // Supabase Storage path for later retrieval
+  photo_url?: string;           // primary photo display URL (backward compat)
+  photo_storage_path?: string;  // primary photo storage path
+  photo_urls?: string[];        // multiple photo display URLs
+  photo_storage_paths?: string[]; // multiple photo storage paths
 }
 
 export interface Report {
