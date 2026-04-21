@@ -41,19 +41,17 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
   const scorePalette = ['#D94F4F', '#F5A623', '#4CAF50', '#C9A84C'];
   const scoreLabels = ['Poor', 'Fair', 'Good', 'Excellent'];
 
-  // Build question map for labels
   const qMap: Record<string, any> = {};
   for (const q of (proformaQuestions ?? [])) {
     if (q?.id) qMap[q.id] = q;
   }
 
-  // Group answers by category
-  const categories: Record<string, { question: any; answer: any }[]> = {};
+  const categories: Record<string, { question: any; answer: any; qId: string }[]> = {};
   for (const [qId, answer] of Object.entries(answers)) {
     const q = qMap[qId];
     const cat = q?.category ?? 'Other';
     if (!categories[cat]) categories[cat] = [];
-    categories[cat].push({ question: q, answer: answer as any });
+    categories[cat].push({ question: q, answer: answer as any, qId });
   }
   for (const cat of Object.keys(categories)) {
     categories[cat].sort((a, b) => (a.question?.order ?? 0) - (b.question?.order ?? 0));
@@ -61,25 +59,28 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
 
   const categoryOrder = ['Booking', 'External', 'Internal', 'Service', 'Dining', 'Facilities', 'Wrap Up', 'Other'];
 
-  // Overall scores
   const scored = Object.values(answers).filter((a: any) => a.score !== undefined) as any[];
   const total = scored.reduce((s: number, a: any) => s + (a.score ?? 0), 0);
   const max = scored.length * 3;
   const starValue = max > 0 ? (total / max) * 5 : 0;
   const starRounded = Math.round(starValue);
 
-  // Score breakdown
+  // Score distribution with explanation
   const breakdownRows = scoreLabels.map((label, i) => {
     const count = scored.filter((a: any) => a.score === i).length;
     const pct = scored.length ? Math.round((count / scored.length) * 100) : 0;
     return `<tr>
-      <td style="padding:4px 8px;font-size:13px;color:#666;width:80px;">${label}</td>
-      <td style="padding:4px 8px;"><div style="background:#eee;border-radius:3px;height:8px;width:200px;"><div style="background:${scorePalette[i]};border-radius:3px;height:8px;width:${pct * 2}px;"></div></div></td>
-      <td style="padding:4px 8px;font-size:13px;color:#444;">${count}</td>
+      <td style="padding:6px 12px;font-size:13px;color:#fff;width:90px;font-weight:600;">${label}</td>
+      <td style="padding:6px 8px;width:220px;">
+        <div style="background:rgba(255,255,255,0.15);border-radius:4px;height:10px;">
+          <div style="background:${scorePalette[i]};border-radius:4px;height:10px;width:${pct}%;"></div>
+        </div>
+      </td>
+      <td style="padding:6px 8px;font-size:13px;color:#ccc;font-weight:600;text-align:right;">${count} question${count !== 1 ? 's' : ''} (${pct}%)</td>
     </tr>`;
   }).join('');
 
-  // Category sections with question labels
+  // Category sections
   const categorySections = categoryOrder
     .filter(cat => categories[cat]?.length > 0)
     .map(cat => {
@@ -87,80 +88,115 @@ function buildReportPdf(report: any, proformaQuestions: any[], photos: any[]) {
       const catScored = items.filter(i => i.answer?.score !== undefined);
       const catTotal = catScored.reduce((s, i) => s + (i.answer.score ?? 0), 0);
       const catMax = catScored.length * 3;
+      const catPct = catMax > 0 ? Math.round((catTotal / catMax) * 100) : 0;
 
-      const rows = items.map(({ question, answer }) => {
+      const rows = items.map(({ question, answer, qId }) => {
         const label = question?.label ?? 'Question';
         const order = question?.order ?? '';
+
         let answerHtml = '';
         if (answer.score !== undefined) {
           const c = scorePalette[answer.score] ?? '#999';
-          answerHtml = `<span style="background:${c}22;color:${c};border:1px solid ${c};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">${answer.score} · ${scoreLabels[answer.score] ?? '—'}</span>`;
+          answerHtml = `<div style="margin-bottom:4px;"><span style="display:inline-block;background:${c}18;color:${c};border:1.5px solid ${c};border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;">${answer.score} \u00b7 ${scoreLabels[answer.score] ?? '\u2014'}</span></div>`;
         }
         if (answer.value !== undefined) {
           const c = answer.value ? '#4CAF50' : '#D94F4F';
-          answerHtml = `<span style="background:${c}22;color:${c};border:1px solid ${c};border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;">${answer.value ? 'Yes' : 'No'}</span>`;
+          answerHtml = `<div style="margin-bottom:4px;"><span style="display:inline-block;background:${c}18;color:${c};border:1.5px solid ${c};border-radius:8px;padding:4px 12px;font-size:13px;font-weight:700;">${answer.value ? 'Yes' : 'No'}</span></div>`;
         }
         if (answer.text) {
-          answerHtml += `<div style="font-size:13px;color:#333;font-style:italic;margin-top:4px;line-height:1.4;">"${answer.text}"</div>`;
+          answerHtml += `<div style="font-size:13px;color:#333;font-style:italic;margin-top:6px;line-height:1.5;padding:8px 12px;background:#f8f8f6;border-radius:6px;">\u201c${answer.text}\u201d</div>`;
         }
         if (answer.notes) {
-          answerHtml += `<div style="font-size:12px;color:#666;font-style:italic;margin-top:2px;">Note: ${answer.notes}</div>`;
+          answerHtml += `<div style="font-size:12px;color:#555;margin-top:6px;padding:6px 12px;background:#C9A84C0D;border-left:3px solid #C9A84C;border-radius:4px;line-height:1.4;"><strong>Note:</strong> ${answer.notes}</div>`;
         }
+
+        // Per-question photo
+        const photoUrl = answer.photo_url;
+        if (photoUrl) {
+          answerHtml += `<div style="margin-top:8px;"><img src="${photoUrl}" style="width:100%;max-width:400px;border-radius:8px;border:1px solid #e0e0e0;" /></div>`;
+        }
+
         return `<tr>
-          <td style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;width:60%;">${order}. ${label}</td>
-          <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${answerHtml}</td>
+          <td style="padding:14px 12px;border-bottom:1px solid #e0e0e0;font-size:13px;color:#333;line-height:1.4;width:55%;vertical-align:top;"><strong>${order}.</strong> ${label}</td>
+          <td style="padding:14px 12px;border-bottom:1px solid #e0e0e0;vertical-align:top;">${answerHtml}</td>
         </tr>`;
       }).join('');
 
-      return `<div style="margin-bottom:28px;">
-        <div style="display:flex;justify-content:space-between;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">
-          <span style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;">${cat}</span>
-          ${catMax > 0 ? `<span style="font-size:12px;font-weight:700;color:#C9A84C;">${catTotal} / ${catMax}</span>` : ''}
+      return `<div style="margin-bottom:32px;page-break-inside:avoid;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:14px;">
+          <span style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;">${cat}</span>
+          ${catMax > 0 ? `<span style="font-size:14px;font-weight:700;color:#C9A84C;">${catTotal} / ${catMax} (${catPct}%)</span>` : ''}
         </div>
         <table style="width:100%;border-collapse:collapse;">${rows}</table>
       </div>`;
     }).join('');
 
-  // Photo section
-  const photoSection = photos.length > 0 ? `
-    <div style="margin-bottom:28px;">
-      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">Photos (${photos.length})</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${photos.map((p: any) => p.url ? `<img src="${p.url}" style="width:150px;height:150px;object-fit:cover;border-radius:8px;" />` : '').join('')}
-      </div>
+  // Photos section — large, clear images
+  const generalPhotos = photos.filter((p: any) => p.url);
+  const photoSection = generalPhotos.length > 0 ? `
+    <div style="margin-bottom:32px;page-break-before:always;">
+      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:16px;">Photos (${generalPhotos.length})</div>
+      ${generalPhotos.map((p: any) => `
+        <div style="margin-bottom:16px;">
+          <img src="${p.url}" style="width:100%;max-width:500px;border-radius:10px;border:1px solid #ddd;" />
+        </div>`).join('')}
     </div>` : '';
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
   body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; background: #fff; }
-  .header { background: #2C2C2E; color: #fff; padding: 32px 40px 24px; }
-  .brand { color: #C9A84C; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
-  .restaurant { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
-  .meta { font-size: 13px; color: #aaa; }
-  .content { padding: 32px 40px; }
-  .score-card { background: #2C2C2E; color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center; }
-  .stars { font-size: 36px; color: #C9A84C; margin: 8px 0 4px; }
-  .footer { background: #f8f8f6; padding: 20px 40px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; }
+  @page { margin: 0; }
 </style></head>
 <body>
-  <div class="header">
-    <div class="brand">5STARX MYSTERY DINE REPORT</div>
-    <div class="restaurant">${restaurantName}</div>
-    <div class="meta">Diner: ${dinerName} &nbsp;·&nbsp; Visit: ${visitDate}${visitTime ? ' at ' + visitTime : ''} &nbsp;·&nbsp; Generated: ${new Date().toLocaleDateString('en-GB')}</div>
-  </div>
-  <div class="content">
-    <div class="score-card">
-      <div style="font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase;">Overall Rating</div>
-      <div class="stars">${max > 0 ? '\u2605'.repeat(starRounded) + '\u2606'.repeat(5 - starRounded) : '\u2014'}</div>
-      <div style="font-size:14px;color:#ddd;font-weight:600;">${max > 0 ? `${total} / ${max} pts \u00b7 ${starValue.toFixed(1)} / 5.0` : 'No scored questions'}</div>
-      ${max > 0 ? `<div style="margin-top:20px;"><table style="margin:0 auto;">${breakdownRows}</table></div>` : ''}
+  <!-- Header -->
+  <div style="background:#2C2C2E;color:#fff;padding:40px 48px 32px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="color:#C9A84C;font-size:14px;font-weight:800;letter-spacing:2px;margin-bottom:12px;">5STARX MYSTERY DINE REPORT</div>
+        <div style="font-size:28px;font-weight:800;margin-bottom:8px;">${restaurantName}</div>
+        <div style="font-size:14px;color:#bbb;line-height:1.6;">
+          Diner: ${dinerName}<br/>
+          Visit: ${visitDate}${visitTime ? ' at ' + visitTime : ''}<br/>
+          Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#C9A84C;font-size:42px;font-weight:800;letter-spacing:1px;">5Starx</div>
+      </div>
     </div>
-    ${adminNotes ? `<div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid #eee;padding-bottom:8px;margin-bottom:10px;">Notes from 5StarX</div><div style="background:#C9A84C18;border-left:3px solid #C9A84C;border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.5;">${adminNotes}</div></div>` : ''}
+  </div>
+
+  <div style="padding:36px 48px;">
+    <!-- Score card -->
+    <div style="background:#2C2C2E;color:#fff;border-radius:14px;padding:28px 32px;margin-bottom:32px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Overall Rating</div>
+        <div style="font-size:40px;color:#C9A84C;margin-bottom:6px;">${max > 0 ? '\u2605'.repeat(starRounded) + '\u2606'.repeat(5 - starRounded) : '\u2014'}</div>
+        <div style="font-size:16px;color:#ddd;font-weight:600;">${max > 0 ? `${total} / ${max} points \u00b7 ${starValue.toFixed(1)} out of 5.0` : 'No scored questions'}</div>
+      </div>
+      ${max > 0 ? `
+      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:18px;">
+        <div style="font-size:11px;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Score distribution across ${scored.length} questions</div>
+        <table style="width:100%;">${breakdownRows}</table>
+      </div>` : ''}
+    </div>
+
+    ${adminNotes ? `
+    <div style="margin-bottom:32px;">
+      <div style="font-size:15px;font-weight:800;color:#2C2C2E;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #C9A84C;padding-bottom:10px;margin-bottom:14px;">Notes from 5StarX</div>
+      <div style="background:#C9A84C0D;border-left:4px solid #C9A84C;border-radius:8px;padding:16px 20px;font-size:14px;line-height:1.6;color:#333;">${adminNotes}</div>
+    </div>` : ''}
+
     ${categorySections}
     ${photoSection}
   </div>
-  <div class="footer">Confidential \u2014 prepared by 5StarX Mystery Dines \u00b7 www.5starx.com</div>
+
+  <!-- Footer -->
+  <div style="background:#2C2C2E;padding:20px 48px;text-align:center;">
+    <div style="color:#C9A84C;font-size:12px;font-weight:700;letter-spacing:1px;">5STARX</div>
+    <div style="font-size:11px;color:#888;margin-top:4px;">Confidential \u2014 prepared by 5StarX Mystery Dines \u00b7 www.5starx.com</div>
+  </div>
 </body></html>`;
 }
 
@@ -171,12 +207,12 @@ export default function AdminReportDetail() {
   const [adminNotes, setAdminNotes] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  const { report, photos, proformaQuestions } = data ?? {};
+  const { data: receiptUrl } = useReceiptUrl(report?.assignment?.receipt_path);
+
   if (isLoading) {
     return <View style={styles.centered}><ActivityIndicator color={colours.gold} size="large" /></View>;
   }
-
-  const { report, photos, proformaQuestions } = data ?? {};
-  const { data: receiptUrl } = useReceiptUrl(report?.assignment?.receipt_path);
   if (!report) return <View style={styles.centered}><Text>Report not found.</Text></View>;
 
   const answers = report.answers ?? {};

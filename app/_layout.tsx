@@ -81,6 +81,9 @@ function AuthGuard() {
 }
 
 async function routeByRole(user: AppUser) {
+  // Small delay to ensure the Root Layout navigator has mounted
+  await new Promise(r => setTimeout(r, 50));
+
   if (user.role === 'admin') {
     router.replace('/(admin)/dashboard');
     return;
