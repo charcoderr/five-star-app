@@ -80,9 +80,16 @@ export default function DinerLayout() {
       <Tabs.Screen name="my-assignments" options={{ title: 'My Dines',  tabBarIcon: tabIcon('calendar-outline') }} />
       <Tabs.Screen name="vouchers"       options={{ title: 'Vouchers',  tabBarIcon: tabIcon('ticket-outline') }} />
       <Tabs.Screen name="profile"        options={{ title: 'Profile',   tabBarIcon: tabIcon('person-outline') }} />
-      {/* Hidden — navigated to programmatically */}
-      <Tabs.Screen name="notifications" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="report"        options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      {/* Hidden — navigated to programmatically. Render a zero-sized View
+          (not null) because Expo Router still allocates tab space for null. */}
+      <Tabs.Screen name="notifications" options={{
+        tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />,
+        tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 },
+      }} />
+      <Tabs.Screen name="report/[assignmentId]" options={{
+        tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />,
+        tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 },
+      }} />
     </Tabs>
   );
 }

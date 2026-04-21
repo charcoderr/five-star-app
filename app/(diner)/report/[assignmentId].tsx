@@ -12,6 +12,7 @@ import { ProformaQuestion, ReportAnswer } from '../../../types';
 import { PROFORMA_CATEGORIES } from '../../../utils/defaultProforma';
 import { useDineTimers } from '../../../hooks/useDineTimers';
 import DineTimerPanel from '../../../components/DineTimerPanel';
+import { DINE_TIMERS, formatSeconds } from '../../../utils/dineTimers';
 import { supabase } from '../../../lib/supabase';
 
 // ─── Score Picker ─────────────────────────────────────────────────────────────
@@ -318,29 +319,43 @@ export default function ReportScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header — two rows: back + saving, then restaurant name */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>{restaurantName}</Text>
-          <Text style={styles.headerSub}>Customer Experience Report</Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          {saveDraft.isPending && <Text style={styles.saving}>Saving…</Text>}
         </View>
-        {saveDraft.isPending && <Text style={styles.saving}>Saving…</Text>}
+        <Text style={styles.headerTitle}>{restaurantName}</Text>
       </View>
+
+      {/* Sticky running-timer bar — sits between header and scroll */}
+      {(() => {
+        const runningDef = DINE_TIMERS.find(d => dineTimers.timers[d.id]?.status === 'running');
+        if (!runningDef) return null;
+        const elapsed = dineTimers.liveElapsed[runningDef.id] ?? 0;
+        return (
+          <View style={styles.stickyTimer}>
+            <Text style={styles.stickyTimerLabel}>{runningDef.shortLabel}</Text>
+            <Text style={styles.stickyTimerTime}>{formatSeconds(elapsed)}</Text>
+            <TouchableOpacity style={styles.stickyTimerStop} onPress={() => dineTimers.stopTimer(runningDef.id)}>
+              <Text style={styles.stickyTimerStopText}>Stop</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })()}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* In-dine timers */}
         <DineTimerPanel
-          enabled={dineTimers.enabled}
-          onToggleEnabled={dineTimers.setEnabled}
           timers={dineTimers.timers}
           liveElapsed={dineTimers.liveElapsed}
           onStart={dineTimers.startTimer}
           onStop={dineTimers.stopTimer}
           onManual={dineTimers.setManualTime}
           onReset={dineTimers.resetTimer}
+          onNotes={dineTimers.setTimerNotes}
         />
 
         {allCategories.map(category => {
@@ -507,13 +522,17 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colours.offWhite, gap: 12 },
   loadingText: { fontSize: 15, color: colours.textSecondary },
   errorText: { fontSize: 15, color: colours.error },
-  header: { paddingTop: 56, paddingBottom: 14, paddingHorizontal: 20, backgroundColor: colours.charcoalDark, flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
-  backBtn: { paddingBottom: 2 },
+  header: { paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: colours.charcoalDark },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  backBtn: {},
   backText: { color: colours.gold, fontSize: 15, fontWeight: '600' },
-  headerText: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colours.white },
-  headerSub: { fontSize: 12, color: colours.charcoalLight, marginTop: 1 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: colours.white },
   saving: { fontSize: 12, color: colours.charcoalLight, fontStyle: 'italic' },
+  stickyTimer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colours.gold, paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
+  stickyTimerLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colours.charcoalDark },
+  stickyTimerTime: { fontSize: 18, fontWeight: '800', color: colours.charcoalDark, fontVariant: ['tabular-nums'] },
+  stickyTimerStop: { backgroundColor: colours.charcoalDark, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  stickyTimerStopText: { fontSize: 13, fontWeight: '700', color: colours.white },
   scroll: { flex: 1 },
   scrollContent: { padding: 16 },
   section: { backgroundColor: colours.white, borderRadius: 14, marginBottom: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },

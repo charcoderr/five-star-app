@@ -21,8 +21,8 @@ export const DINE_TIMERS: TimerDefinition[] = [
     id: 'drinks_order',
     label: 'Drinks order taken',
     shortLabel: 'Drinks order',
-    targetSeconds: 4 * 60,        // 4 min target
-    autoCancelSeconds: 10 * 60,   // cancel at 10 min
+    targetSeconds: 4 * 60,
+    autoCancelSeconds: 10 * 60,
     scoreThresholds: [4 * 60, 5 * 60, 6 * 60],
   },
   {
@@ -42,12 +42,28 @@ export const DINE_TIMERS: TimerDefinition[] = [
     scoreThresholds: [10 * 60, 13 * 60, 16 * 60],
   },
   {
-    id: 'food_arrived',
-    label: 'Food arrived',
-    shortLabel: 'Food arrived',
-    targetSeconds: 20 * 60,
-    autoCancelSeconds: 45 * 60,
-    scoreThresholds: [20 * 60, 25 * 60, 30 * 60],
+    id: 'starters_arrived',
+    label: 'Starters arrived',
+    shortLabel: 'Starters',
+    targetSeconds: 10 * 60,
+    autoCancelSeconds: 25 * 60,
+    scoreThresholds: [10 * 60, 13 * 60, 16 * 60],
+  },
+  {
+    id: 'mains_arrived',
+    label: 'Mains arrived',
+    shortLabel: 'Mains',
+    targetSeconds: 15 * 60,
+    autoCancelSeconds: 35 * 60,
+    scoreThresholds: [15 * 60, 20 * 60, 25 * 60],
+  },
+  {
+    id: 'desserts_arrived',
+    label: 'Desserts arrived',
+    shortLabel: 'Desserts',
+    targetSeconds: 10 * 60,
+    autoCancelSeconds: 25 * 60,
+    scoreThresholds: [10 * 60, 13 * 60, 16 * 60],
   },
   {
     id: 'bill_arrived',
@@ -102,13 +118,14 @@ export interface TimerState {
   startedAt: number | null;        // Date.now() when started
   elapsedSeconds: number | null;   // Final elapsed (stopped or cancelled)
   suggestedScore: number | null;   // 0–3, null if not recorded
+  notes: string;                   // Diner's note about this timing
 }
 
 export function buildInitialTimers(): Record<string, TimerState> {
   return Object.fromEntries(
     DINE_TIMERS.map(t => [
       t.id,
-      { id: t.id, status: 'idle', startedAt: null, elapsedSeconds: null, suggestedScore: null },
+      { id: t.id, status: 'idle', startedAt: null, elapsedSeconds: null, suggestedScore: null, notes: '' },
     ])
   );
 }

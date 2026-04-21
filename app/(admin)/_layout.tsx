@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colours } from '../../utils/theme';
@@ -34,15 +35,14 @@ export default function AdminLayout() {
       <Tabs.Screen name="diners"      options={{ title: 'Diners', tabBarIcon: tabIcon('people-outline') }} />
       <Tabs.Screen name="more"        options={{ title: 'More',   tabBarIcon: tabIcon('ellipsis-horizontal-outline') }} />
 
-      {/* Hidden from tab bar — accessed via More screen or push navigation.
-          tabBarButton renders nothing; tabBarItemStyle ensures zero width
-          so the tab bar doesn't allocate space for these items. */}
-      <Tabs.Screen name="reports"     options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="restaurants" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="vouchers"    options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="tcs-editor"  options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="report"      options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
-      <Tabs.Screen name="restaurant"  options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none', width: 0 } }} />
+      {/* Hidden from tab bar — render zero-sized View (not null) to prevent
+          Expo Router from allocating tab space for dynamic route directories. */}
+      <Tabs.Screen name="reports"     options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
+      <Tabs.Screen name="restaurants" options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
+      <Tabs.Screen name="vouchers"    options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
+      <Tabs.Screen name="tcs-editor"  options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
+      <Tabs.Screen name="report/[reportId]"          options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
+      <Tabs.Screen name="restaurant/[restaurantId]"  options={{ tabBarButton: () => <View style={{ width: 0, height: 0, overflow: 'hidden' }} />, tabBarItemStyle: { width: 0, maxWidth: 0, minWidth: 0, padding: 0, margin: 0 } }} />
     </Tabs>
   );
 }

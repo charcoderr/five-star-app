@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Switch, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
 } from 'react-native';
 import { colours } from '../utils/theme';
 import {
@@ -15,18 +15,17 @@ const SCORE_LABELS  = ['Poor', 'Fair', 'Good', 'Excellent'];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
-  enabled: boolean;
-  onToggleEnabled: (v: boolean) => void;
   timers: Record<string, TimerState>;
   liveElapsed: Record<string, number>;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onManual: (id: string, seconds: number) => void;
   onReset: (id: string) => void;
+  onNotes: (id: string, text: string) => void;
 }
 
 // ─── Individual timer row ─────────────────────────────────────────────────────
-function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset }: {
+function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset, onNotes }: {
   def: typeof DINE_TIMERS[number];
   state: TimerState;
   liveSeconds?: number;
@@ -34,6 +33,7 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
   onStop: () => void;
   onManual: (seconds: number) => void;
   onReset: () => void;
+  onNotes: (text: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -43,7 +43,6 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
   const isCancelled = state.status === 'cancelled';
   const isIdle     = state.status === 'idle';
 
-  // Display time
   const displaySeconds = isRunning
     ? (liveSeconds ?? 0)
     : (state.elapsedSeconds ?? 0);
@@ -67,7 +66,6 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
 
       {/* Display + controls */}
       <View style={rowStyles.right}>
-        {/* Time display / edit input */}
         {editing ? (
           <TextInput
             style={rowStyles.editInput}
@@ -106,7 +104,6 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
           </TouchableOpacity>
         )}
 
-        {/* Score badge */}
         {(isStopped) && state.suggestedScore !== null && (
           <View style={[rowStyles.scoreBadge, { backgroundColor: SCORE_COLOURS[state.suggestedScore] + '22', borderColor: SCORE_COLOURS[state.suggestedScore] }]}>
             <Text style={[rowStyles.scoreText, { color: SCORE_COLOURS[state.suggestedScore] }]}>
@@ -115,7 +112,6 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
           </View>
         )}
 
-        {/* Action buttons */}
         {isIdle && (
           <TouchableOpacity style={rowStyles.startBtn} onPress={onStart}>
             <Text style={rowStyles.startBtnText}>Start</Text>
@@ -135,12 +131,24 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
         )}
       </View>
 
-      {/* Edit hint for stopped timers */}
+      {/* Edit hint */}
       {isStopped && !editing && (
         <Text style={rowStyles.editHint}>Tap time to edit</Text>
       )}
       {isCancelled && !editing && (
         <Text style={rowStyles.editHint}>Tap 'Cancelled' to enter time manually</Text>
+      )}
+
+      {/* Notes field — visible when timer has been used */}
+      {(isStopped || isCancelled) && (
+        <TextInput
+          style={rowStyles.notesInput}
+          value={state.notes}
+          onChangeText={onNotes}
+          placeholder="Add a note..."
+          placeholderTextColor={colours.textMuted}
+          multiline
+        />
       )}
     </View>
   );
@@ -148,46 +156,35 @@ function TimerRow({ def, state, liveSeconds, onStart, onStop, onManual, onReset 
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
 export default function DineTimerPanel({
-  enabled, onToggleEnabled,
   timers, liveElapsed,
-  onStart, onStop, onManual, onReset,
+  onStart, onStop, onManual, onReset, onNotes,
 }: Props) {
   return (
     <View style={styles.panel}>
-      {/* Toggle row */}
-      <View style={styles.toggleRow}>
-        <View>
-          <Text style={styles.panelTitle}>In-Dine Timers</Text>
-          <Text style={styles.panelSub}>Track service times as you dine</Text>
-        </View>
-        <Switch
-          value={enabled}
-          onValueChange={onToggleEnabled}
-          trackColor={{ false: colours.border, true: colours.gold }}
-          thumbColor={colours.white}
-        />
+      <View style={styles.headerRow}>
+        <Text style={styles.panelTitle}>In-Dine Timers</Text>
+        <Text style={styles.panelSub}>Track service times as you dine</Text>
       </View>
 
-      {enabled && (
-        <View style={styles.timersContainer}>
-          <Text style={styles.hint}>
-            Start each timer when the event begins, stop when it happens.
-            Timers auto-cancel if left running too long. You can edit any time after stopping.
-          </Text>
-          {DINE_TIMERS.map(def => (
-            <TimerRow
-              key={def.id}
-              def={def}
-              state={timers[def.id]}
-              liveSeconds={liveElapsed[def.id]}
-              onStart={() => onStart(def.id)}
-              onStop={() => onStop(def.id)}
-              onManual={secs => onManual(def.id, secs)}
-              onReset={() => onReset(def.id)}
-            />
-          ))}
-        </View>
-      )}
+      <View style={styles.timersContainer}>
+        <Text style={styles.hint}>
+          Start each timer when the event begins, stop when it happens.
+          Timers auto-cancel if left running too long. You can edit any time after stopping.
+        </Text>
+        {DINE_TIMERS.map(def => (
+          <TimerRow
+            key={def.id}
+            def={def}
+            state={timers[def.id]}
+            liveSeconds={liveElapsed[def.id]}
+            onStart={() => onStart(def.id)}
+            onStop={() => onStop(def.id)}
+            onManual={secs => onManual(def.id, secs)}
+            onReset={() => onReset(def.id)}
+            onNotes={text => onNotes(def.id, text)}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -205,10 +202,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headerRow: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: colours.charcoalDark,
@@ -281,4 +275,15 @@ const rowStyles = StyleSheet.create({
   },
   resetBtnText: { fontSize: 18, color: colours.textSecondary },
   editHint: { fontSize: 11, color: colours.textMuted, marginTop: 4 },
+  notesInput: {
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: colours.offWhite,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colours.border,
+    fontSize: 13,
+    color: colours.textPrimary,
+    minHeight: 36,
+  },
 });

@@ -9,7 +9,6 @@ import {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useDineTimers() {
-  const [enabled, setEnabled] = useState(false);
   const [timers, setTimers] = useState<Record<string, TimerState>>(buildInitialTimers);
   // Tracks the live elapsed seconds for running timers (display only)
   const [liveElapsed, setLiveElapsed] = useState<Record<string, number>>({});
@@ -50,7 +49,7 @@ export function useDineTimers() {
 
     setTimers(prev => ({
       ...prev,
-      [id]: { id, status: 'running', startedAt, elapsedSeconds: null, suggestedScore: null },
+      [id]: { id, status: 'running', startedAt, elapsedSeconds: null, suggestedScore: null, notes: prev[id]?.notes ?? '' },
     }));
     setLiveElapsed(le => ({ ...le, [id]: 0 }));
 
@@ -123,7 +122,7 @@ export function useDineTimers() {
     }
     setTimers(prev => ({
       ...prev,
-      [id]: { id, status: 'idle', startedAt: null, elapsedSeconds: null, suggestedScore: null },
+      [id]: { id, status: 'idle', startedAt: null, elapsedSeconds: null, suggestedScore: null, notes: '' },
     }));
     setLiveElapsed(le => {
       const next = { ...le };
@@ -139,14 +138,20 @@ export function useDineTimers() {
     };
   }, []);
 
+  const setTimerNotes = useCallback((id: string, notes: string) => {
+    setTimers(prev => ({
+      ...prev,
+      [id]: { ...prev[id], notes },
+    }));
+  }, []);
+
   return {
-    enabled,
-    setEnabled,
     timers,
     liveElapsed,
     startTimer,
     stopTimer,
     setManualTime,
     resetTimer,
+    setTimerNotes,
   };
 }
